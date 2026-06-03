@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from factorio_optimizer.composition.composition_expander import expand_composition_to_blueprint_plan
+from factorio_optimizer.composition.transport_belt_composition import build_transport_belt_composition_v1
 from factorio_optimizer.expansion.module_expander import expand_module_to_blueprint_plan
 from factorio_optimizer.expansion.module_graph_expander import expand_module_graph_to_blueprint_plan
 from factorio_optimizer.export.blueprint_json_exporter import export_plan_to_blueprint_json
@@ -13,6 +15,7 @@ from factorio_optimizer.rates.module_rate import build_module_rate_report
 from factorio_optimizer.rates.rate_report import build_machine_rate_report
 from factorio_optimizer.render.ascii_renderer import render_ascii
 from factorio_optimizer.scoring.basic_fitness import score_plan
+from factorio_optimizer.validation.connection_validator import validate_modules_connections
 from factorio_optimizer.validation.recipe_validator import RecipeValidationSpec, validate_recipe_plan
 from factorio_optimizer.validation.static_validator import validate_plan
 
@@ -69,6 +72,18 @@ def print_recipe_plan(plan, spec: RecipeValidationSpec) -> None:
     else:
         print("FAIL")
         for error in validation.errors:
+            print(f"- {error}")
+
+
+def print_connection_validation(composition) -> None:
+    result = validate_modules_connections(composition.modules)
+    print()
+    print("Connection validation:")
+    if result.passed:
+        print("PASS")
+    else:
+        print("FAIL")
+        for error in result.errors:
             print(f"- {error}")
 
 
@@ -150,6 +165,32 @@ def run_transport_belt_module_pipeline() -> None:
         print("Transport belt module plan is not valid yet.")
 
 
+def run_transport_belt_composition_pipeline() -> None:
+    print()
+    print("# Transport belt composed module pipeline")
+
+    composition = build_transport_belt_composition_v1()
+    plan = expand_composition_to_blueprint_plan(
+        composition=composition,
+        plan_id="transport_belt_composition_v1_expanded",
+        width=12,
+        height=11,
+    )
+    spec = RecipeValidationSpec(
+        recipe="transport_belt",
+        input_items=("iron_plate",),
+        output_item="transport_belt",
+    )
+
+    print_recipe_plan(plan, spec)
+    print_connection_validation(composition)
+
+    if validate_recipe_plan(plan, spec).passed:
+        print_best_blueprint(plan)
+    else:
+        print("Transport belt composition plan is not valid yet.")
+
+
 def run_rate_reports() -> None:
     print()
     print("# Theoretical machine rate reports")
@@ -203,6 +244,7 @@ def main() -> None:
     run_legacy_object_flow_pipeline()
     run_module_pipeline()
     run_transport_belt_module_pipeline()
+    run_transport_belt_composition_pipeline()
     run_rate_reports()
     run_module_rate_reports()
     run_efficiency_reports()
