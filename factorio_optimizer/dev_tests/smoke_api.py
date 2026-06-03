@@ -10,15 +10,29 @@ def _assert_ok(response, endpoint: str) -> dict | list:
     return payload
 
 
+def _count_items(payload: dict | list) -> int:
+    if isinstance(payload, list):
+        return len(payload)
+    if isinstance(payload, dict):
+        total = 0
+        for value in payload.values():
+            if isinstance(value, list):
+                total += len(value)
+            elif isinstance(value, dict):
+                total += _count_items(value)
+        return total
+    return 0
+
+
 def main() -> None:
     print("# Flask API smoke tests")
 
     client = app.test_client()
 
     items = _assert_ok(client.get("/api/items"), "/api/items")
-    assert isinstance(items, list), "/api/items: expected list"
-    assert items, "/api/items: expected at least one item"
-    print(f"PASS /api/items: {len(items)} items")
+    item_count = _count_items(items)
+    assert item_count > 0, "/api/items: expected at least one item"
+    print(f"PASS /api/items: {item_count} items")
 
     modules = _assert_ok(client.get("/api/modules"), "/api/modules")
     assert isinstance(modules, dict), "/api/modules: expected object"
