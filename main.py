@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from factorio_optimizer.composition.composition_expander import expand_composition_to_blueprint_plan
 from factorio_optimizer.composition.transport_belt_composition import build_transport_belt_composition_v1
+from factorio_optimizer.data.machines import get_machine
+from factorio_optimizer.data.resources import get_resource
 from factorio_optimizer.expansion.module_expander import expand_module_to_blueprint_plan
 from factorio_optimizer.expansion.module_graph_expander import expand_module_graph_to_blueprint_plan
 from factorio_optimizer.export.blueprint_json_exporter import export_plan_to_blueprint_json
@@ -12,8 +14,11 @@ from factorio_optimizer.mutation.iron_gear_mutations import generate_iron_gear_v
 from factorio_optimizer.planner.iron_gear_builder import build_iron_gear_plan
 from factorio_optimizer.rates.bottleneck_report import format_bottleneck_report
 from factorio_optimizer.rates.efficiency_report import build_efficiency_report, format_efficiency_report
+from factorio_optimizer.rates.fuel_rate import calculate_burner_coal_miner_net_output
+from factorio_optimizer.rates.mining_rate import calculate_mining_rate, calculate_required_miners
 from factorio_optimizer.rates.module_rate import build_module_rate_report
 from factorio_optimizer.rates.rate_report import build_machine_rate_report
+from factorio_optimizer.rates.starter_power import estimate_starter_steam_power, format_starter_power_estimate
 from factorio_optimizer.rates.throughput_checks import build_transport_belt_v0_throughput_report
 from factorio_optimizer.render.ascii_renderer import render_ascii
 from factorio_optimizer.scoring.basic_fitness import score_plan
@@ -249,6 +254,45 @@ def run_bottleneck_reports() -> None:
     print(format_bottleneck_report(build_transport_belt_v0_throughput_report()))
 
 
+def run_raw_resource_reports() -> None:
+    print()
+    print("# Raw resource and starter power reports")
+
+    electric_iron = calculate_mining_rate(
+        resource=get_resource("iron_ore"),
+        miner=get_machine("electric_mining_drill"),
+    )
+    burner_coal = calculate_mining_rate(
+        resource=get_resource("coal"),
+        miner=get_machine("burner_mining_drill"),
+    )
+    gross, fuel_use, net = calculate_burner_coal_miner_net_output()
+
+    print("=" * 40)
+    print(
+        f"Electric miner iron ore: {electric_iron.output_per_second:.3f}/s, "
+        f"{electric_iron.output_per_minute:.1f}/min, "
+        f"{electric_iron.output_per_hour:.1f}/hour"
+    )
+    print(
+        f"Burner miner coal gross: {burner_coal.output_per_second:.3f}/s, "
+        f"{burner_coal.output_per_minute:.1f}/min, "
+        f"{burner_coal.output_per_hour:.1f}/hour"
+    )
+    print(
+        f"Burner coal miner fuel use: {fuel_use:.3f}/s, "
+        f"net coal: {net:.3f}/s"
+    )
+    print(
+        "Electric iron miners needed for 2 iron_ore/s: "
+        f"{calculate_required_miners('iron_ore', 'electric_mining_drill', 2.0)}"
+    )
+
+    print()
+    print("=" * 40)
+    print(format_starter_power_estimate(estimate_starter_steam_power(150.0)))
+
+
 def main() -> None:
     run_legacy_object_flow_pipeline()
     run_module_pipeline()
@@ -258,6 +302,7 @@ def main() -> None:
     run_module_rate_reports()
     run_efficiency_reports()
     run_bottleneck_reports()
+    run_raw_resource_reports()
 
 
 if __name__ == "__main__":
