@@ -32,6 +32,25 @@ RECIPES: dict[str, Recipe] = {
         crafting_time_seconds=3.2,
         category="smelting",
     ),
+    "copper_plate": Recipe(
+        name="copper_plate",
+        inputs={"copper_ore": 1},
+        outputs={"copper_plate": 1},
+        crafting_time_seconds=3.2,
+        category="smelting",
+    ),
+    "copper_cable": Recipe(
+        name="copper_cable",
+        inputs={"copper_plate": 1},
+        outputs={"copper_cable": 2},
+        crafting_time_seconds=0.5,
+    ),
+    "electronic_circuit": Recipe(
+        name="electronic_circuit",
+        inputs={"iron_plate": 1, "copper_cable": 3},
+        outputs={"electronic_circuit": 1},
+        crafting_time_seconds=0.5,
+    ),
 }
 
 
