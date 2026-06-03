@@ -16,25 +16,17 @@ class SplitterSegment(Segment):
         self.ports = self._build_ports()
 
     def expand(self) -> list[FactoryObject]:
-        # Temporary representation: the object model does not have a splitter type yet.
-        # Until export support is added, keep the splitter as two belt tiles.
         return [
             FactoryObject(
-                object_id=f"{self.segment_id}_splitter_left_stub",
-                object_type="belt",
+                object_id=f"{self.segment_id}_splitter",
+                object_type="splitter",
                 position=self.position,
                 direction=self.direction,
+                width=2,
+                height=1,
                 item=self.item,
-                role="splitter_stub",
-            ),
-            FactoryObject(
-                object_id=f"{self.segment_id}_splitter_right_stub",
-                object_type="belt",
-                position=Position(self.position.x + 1, self.position.y),
-                direction=self.direction,
-                item=self.item,
-                role="splitter_stub",
-            ),
+                role="splitter",
+            )
         ]
 
     def _build_ports(self) -> list[SegmentPort]:
