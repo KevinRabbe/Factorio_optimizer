@@ -18,6 +18,7 @@ from factorio_optimizer.rates.fuel_rate import calculate_burner_coal_miner_net_o
 from factorio_optimizer.rates.mining_rate import calculate_mining_rate, calculate_required_miners
 from factorio_optimizer.rates.module_rate import build_module_rate_report
 from factorio_optimizer.rates.rate_report import build_machine_rate_report
+from factorio_optimizer.rates.repair_recommendations import format_repair_recommendations, recommend_repairs
 from factorio_optimizer.rates.starter_power import estimate_starter_steam_power, format_starter_power_estimate
 from factorio_optimizer.rates.throughput_checks import build_transport_belt_v0_throughput_report
 from factorio_optimizer.render.ascii_renderer import render_ascii
@@ -251,7 +252,10 @@ def run_bottleneck_reports() -> None:
     print()
     print("# Throughput bottleneck reports")
     print("=" * 40)
-    print(format_bottleneck_report(build_transport_belt_v0_throughput_report()))
+    report = build_transport_belt_v0_throughput_report()
+    print(format_bottleneck_report(report))
+    print()
+    print(format_repair_recommendations(recommend_repairs(report)))
 
 
 def run_raw_resource_reports() -> None:
