@@ -12,6 +12,7 @@ ObjectType = Literal[
     "assembler",
     "inserter",
     "belt",
+    "splitter",
 ]
 
 
