@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Factorio Optimizer — Factory Efficiency Planner</title>
+  <meta name="description" content="Optimize your Factorio factory for maximum machine uptime, energy efficiency, and production throughput. Find the best machine ratios for any item." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+<!-- ═══════════════════ HEADER ═══════════════════ -->
+<header class="app-header">
+  <div class="header-brand">
+    <span class="header-icon">⚙️</span>
+    <div>
+      <h1 class="header-title">Factorio Optimizer</h1>
+      <p class="header-subtitle">100% uptime · max efficiency · zero waste</p>
+    </div>
+  </div>
+  <div class="header-actions">
+    <span class="version-badge">v0.2.0</span>
+  </div>
+</header>
+
+<!-- ═══════════════════ MAIN LAYOUT ═══════════════════ -->
+<main class="app-layout">
+
+  <!-- ─── LEFT PANEL: Item picker ─────────────────────────── -->
+  <aside class="panel panel-items" id="item-panel">
+    <div class="panel-header">
+      <span>📦 Select Target Item</span>
+    </div>
+
+    <div class="search-wrap">
+      <input id="item-search" class="search-input" type="text" placeholder="Search items…" autocomplete="off" />
+      <span class="search-icon">🔍</span>
+    </div>
+
+    <div class="era-tabs">
+      <button class="era-tab active" data-era="early" id="tab-early">⚡ Early</button>
+      <button class="era-tab" data-era="mid" id="tab-mid">🔬 Mid</button>
+      <button class="era-tab" data-era="end" id="tab-end">🚀 Future</button>
+      <button class="era-tab" data-era="saved" id="tab-saved">⭐ Saved</button>
+    </div>
+
+    <div class="item-list" id="item-list">
+      <div class="loading-spinner">Loading items…</div>
+    </div>
+    
+    <div class="item-list" id="saved-list" style="display:none">
+      <div class="loading-spinner">Loading saved layouts…</div>
+    </div>
+  </aside>
+
+  <!-- ─── CENTER PANEL: Configuration ─────────────────────── -->
+  <section class="panel panel-config" id="config-panel">
+    <div class="panel-header">
+      <span>⚙️ Configuration</span>
+    </div>
+
+    <!-- Selected item display -->
+    <div class="selected-item-card" id="selected-item-card">
+      <span class="selected-item-icon" id="sel-icon">📦</span>
+      <div>
+        <div class="selected-item-name" id="sel-name">No item selected</div>
+        <div class="selected-item-sub" id="sel-sub">Pick an item from the left panel</div>
+      </div>
+    </div>
+
+    <!-- Target rate -->
+    <div class="config-section">
+      <label class="config-label">🎯 Target Production Rate</label>
+      <div class="rate-row">
+        <input id="rate-input" class="rate-input" type="number" value="30" min="0.01" step="1" />
+        <select id="rate-unit" class="rate-unit-select">
+          <option value="per_minute">/ minute</option>
+          <option value="per_second">/ second</option>
+          <option value="per_hour">/ hour</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Machine era -->
+    <div class="config-section">
+      <label class="config-label">🏭 Machine Tier</label>
+      <div class="tier-buttons" id="tier-buttons">
+        <button class="tier-btn" data-era="early" id="tier-early">
+          <span class="tier-icon">🔨</span>
+          <span class="tier-name">Early Game</span>
+          <span class="tier-desc">Assembler 1 · Stone Furnace</span>
+        </button>
+        <button class="tier-btn active" data-era="mid" id="tier-mid">
+          <span class="tier-icon">⚙️</span>
+          <span class="tier-name">Mid Game</span>
+          <span class="tier-desc">Assembler 2 · Steel/Electric Furnace</span>
+        </button>
+        <button class="tier-btn" data-era="end" id="tier-end">
+          <span class="tier-icon">🚀</span>
+          <span class="tier-name">End Game</span>
+          <span class="tier-desc">Assembler 3 · Electric Furnace</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Furnace toggle (mid/end only) -->
+    <div class="config-section" id="furnace-section">
+      <label class="config-label">🔥 Smelting Furnace</label>
+      <div class="toggle-row">
+        <button class="toggle-btn active" id="furnace-steel" onclick="setFurnace(false)">
+          🔥 Steel Furnace <span class="toggle-note">(burner)</span>
+        </button>
+        <button class="toggle-btn" id="furnace-electric" onclick="setFurnace(true)">
+          ⚡ Electric Furnace <span class="toggle-note">(modules)</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Module selection -->
+    <div class="config-section" id="module-section">
+      <label class="config-label">🧩 Modules
+        <span class="label-note">Applied to all compatible machines</span>
+      </label>
+      <div class="module-grid" id="module-grid">
+        <div class="loading-spinner">Loading modules…</div>
+      </div>
+      <div class="active-modules" id="active-modules">
+        <span class="no-modules-note">No modules selected — click to add</span>
+      </div>
+    </div>
+
+    <!-- Optimize button -->
+    <button class="optimize-btn" id="optimize-btn" onclick="runOptimize()" disabled>
+      <span class="optimize-icon">▶</span>
+      <span id="optimize-btn-text">Select an item first</span>
+    </button>
+  </section>
+
+  <!-- ─── RIGHT PANEL: Results ─────────────────────────────── -->
+  <section class="panel panel-results" id="results-panel">
+    <div class="panel-header">
+      <span>📊 Results</span>
+      <div class="results-tabs" id="results-tabs" style="display:none">
+        <button class="res-tab active" id="rtab-best" onclick="showResultTab('best')">Best Plan</button>
+        <button class="res-tab" id="rtab-compare" onclick="showResultTab('compare')">Compare</button>
+        <button class="res-tab" id="rtab-energy" onclick="showResultTab('energy')">Energy</button>
+        <button class="res-tab" id="rtab-raw" onclick="showResultTab('raw')">Raw Inputs</button>
+      </div>
+    </div>
+
+    <div id="results-placeholder" class="results-placeholder">
+      <div class="placeholder-icon">⚗️</div>
+      <p class="placeholder-title">Ready to Optimize</p>
+      <p class="placeholder-sub">Configure your factory on the left, then press Optimize.</p>
+    </div>
+
+    <div id="results-loading" class="results-loading" style="display:none">
+      <div class="spinner-ring"></div>
+      <p>Solving production chain…</p>
+    </div>
+
+    <!-- BEST PLAN TAB -->
+    <div id="tab-best" class="result-tab-content" style="display:none">
+      <div style="display:flex; justify-content: flex-end; margin-bottom: 10px;">
+        <button class="save-layout-btn" onclick="saveCurrentLayout()">
+          ⭐ Save to Favorites
+        </button>
+      </div>
+      <!-- Summary cards -->
+      <div class="summary-cards" id="summary-cards"></div>
+      <!-- Chain tree -->
+      <div class="section-title">🌿 Production Chain</div>
+      <div class="chain-tree" id="chain-tree"></div>
+    </div>
+
+    <!-- COMPARE TAB -->
+    <div id="tab-compare" class="result-tab-content" style="display:none">
+      <div class="section-title">🏆 Plan Comparison</div>
+      <div id="compare-table"></div>
+    </div>
+
+    <!-- ENERGY TAB -->
+    <div id="tab-energy" class="result-tab-content" style="display:none">
+      <div class="energy-view" id="energy-view"></div>
+    </div>
+
+    <!-- RAW INPUTS TAB -->
+    <div id="tab-raw" class="result-tab-content" style="display:none">
+      <div class="section-title">⛏️ Raw Resource Demands</div>
+      <div id="raw-inputs-view"></div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═══════════════════ BLUEPRINT TOAST ═══════════════════ -->
+<div id="toast" class="toast" style="display:none">
+  <span class="toast-icon">✅</span> Blueprint string copied!
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
