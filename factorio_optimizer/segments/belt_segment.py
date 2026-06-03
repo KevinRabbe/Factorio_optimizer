@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from factorio_optimizer.core.objects import Direction, FactoryObject, Position
 from factorio_optimizer.segments.ports import SegmentPort
@@ -78,5 +78,4 @@ def create_belt_segment(
         direction=direction,
         item=item,
         length=length,
-        ports=field(default_factory=list),
     )
