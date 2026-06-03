@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Literal
 
 
@@ -18,7 +18,7 @@ class Machine:
     energy_source: EnergySource = "electric"
     allowed_categories: tuple[str, ...] = ()
     module_slots: int = 0
-    era: str = "early"   # "early", "mid", "end"
+    era: str = "early"
     display_name: str = ""
 
     def __post_init__(self) -> None:
@@ -27,7 +27,6 @@ class Machine:
 
 
 MACHINES: dict[str, Machine] = {
-    # ── Early game assemblers ──────────────────────────────────────────────
     "assembling_machine_1": Machine(
         name="assembling_machine_1",
         display_name="Assembling Machine 1",
@@ -39,7 +38,6 @@ MACHINES: dict[str, Machine] = {
         module_slots=0,
         era="early",
     ),
-    # ── Mid game assemblers ────────────────────────────────────────────────
     "assembling_machine_2": Machine(
         name="assembling_machine_2",
         display_name="Assembling Machine 2",
@@ -47,7 +45,7 @@ MACHINES: dict[str, Machine] = {
         crafting_speed=0.75,
         power_kw=150.0,
         energy_source="electric",
-        allowed_categories=("crafting",),
+        allowed_categories=("crafting", "crafting-with-fluid"),
         module_slots=2,
         era="mid",
     ),
@@ -58,11 +56,10 @@ MACHINES: dict[str, Machine] = {
         crafting_speed=1.25,
         power_kw=375.0,
         energy_source="electric",
-        allowed_categories=("crafting",),
+        allowed_categories=("crafting", "crafting-with-fluid"),
         module_slots=4,
         era="end",
     ),
-    # ── Furnaces ───────────────────────────────────────────────────────────
     "stone_furnace": Machine(
         name="stone_furnace",
         display_name="Stone Furnace",
@@ -96,7 +93,6 @@ MACHINES: dict[str, Machine] = {
         module_slots=2,
         era="mid",
     ),
-    # ── Mining drills ──────────────────────────────────────────────────────
     "burner_mining_drill": Machine(
         name="burner_mining_drill",
         display_name="Burner Mining Drill",
@@ -116,7 +112,6 @@ MACHINES: dict[str, Machine] = {
         module_slots=3,
         era="early",
     ),
-    # ── Chemical plant ─────────────────────────────────────────────────────
     "chemical_plant": Machine(
         name="chemical_plant",
         display_name="Chemical Plant",
@@ -128,7 +123,6 @@ MACHINES: dict[str, Machine] = {
         module_slots=3,
         era="mid",
     ),
-    # ── Oil refinery ───────────────────────────────────────────────────────
     "oil_refinery": Machine(
         name="oil_refinery",
         display_name="Oil Refinery",
@@ -151,14 +145,12 @@ def get_machine(machine_name: str) -> Machine:
 
 
 def get_machines_for_era(era: str) -> list[Machine]:
-    """Return all machines available at or before the given era."""
     order = ["early", "mid", "end"]
     cutoff = order.index(era)
     return [m for m in MACHINES.values() if order.index(m.era) <= cutoff]
 
 
 def get_best_machine_for_category(category: str, era: str) -> Machine | None:
-    """Return the fastest machine that can handle the given crafting category at the era."""
     era_order = ["early", "mid", "end"]
     cutoff = era_order.index(era)
     candidates = [
