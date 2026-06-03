@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from factorio_optimizer.expansion.module_expander import expand_module_to_blueprint_plan
 from factorio_optimizer.export.blueprint_json_exporter import export_plan_to_blueprint_json
 from factorio_optimizer.export.blueprint_string_encoder import encode_blueprint_string
+from factorio_optimizer.modules.iron_gear_module import build_iron_gear_module
 from factorio_optimizer.mutation.iron_gear_mutations import generate_iron_gear_variants
 from factorio_optimizer.planner.iron_gear_builder import build_iron_gear_plan
 from factorio_optimizer.render.ascii_renderer import render_ascii
@@ -40,7 +42,17 @@ def print_plan(plan) -> None:
             print(f"- {error}")
 
 
-def main() -> None:
+def print_best_blueprint(plan) -> None:
+    blueprint_json = export_plan_to_blueprint_json(plan)
+    blueprint_string = encode_blueprint_string(blueprint_json)
+
+    print("=" * 40)
+    print(f"Best plan: {plan.plan_id}")
+    print("Blueprint string:")
+    print(blueprint_string)
+
+
+def run_legacy_object_flow_pipeline() -> None:
     base_plan = build_iron_gear_plan()
     variants = generate_iron_gear_variants(base_plan)
 
@@ -50,24 +62,42 @@ def main() -> None:
         reverse=True,
     )
 
+    print("# Legacy object-flow pipeline")
     print(f"Generated {len(scored_variants)} valid variants.")
     print()
 
     for variant in scored_variants:
         print_plan(variant)
 
-    if not scored_variants:
-        print("No valid variants to export.")
-        return
+    if scored_variants:
+        print_best_blueprint(scored_variants[0])
+    else:
+        print("No valid legacy variants to export.")
 
-    best_plan = scored_variants[0]
-    blueprint_json = export_plan_to_blueprint_json(best_plan)
-    blueprint_string = encode_blueprint_string(blueprint_json)
 
-    print("=" * 40)
-    print(f"Best plan: {best_plan.plan_id}")
-    print("Blueprint string:")
-    print(blueprint_string)
+def run_module_pipeline() -> None:
+    print()
+    print("# Segment/module pipeline")
+
+    module = build_iron_gear_module()
+    plan = expand_module_to_blueprint_plan(
+        module=module,
+        plan_id="iron_gear_module_expanded",
+        width=9,
+        height=7,
+    )
+
+    print_plan(plan)
+
+    if validate_plan(plan).passed:
+        print_best_blueprint(plan)
+    else:
+        print("Module-expanded plan is not valid yet.")
+
+
+def main() -> None:
+    run_legacy_object_flow_pipeline()
+    run_module_pipeline()
 
 
 if __name__ == "__main__":
