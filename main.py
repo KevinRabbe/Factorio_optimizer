@@ -10,9 +10,11 @@ from factorio_optimizer.modules.iron_gear_module import build_iron_gear_module
 from factorio_optimizer.modules.transport_belt_module import build_transport_belt_module_v0
 from factorio_optimizer.mutation.iron_gear_mutations import generate_iron_gear_variants
 from factorio_optimizer.planner.iron_gear_builder import build_iron_gear_plan
+from factorio_optimizer.rates.bottleneck_report import format_bottleneck_report
 from factorio_optimizer.rates.efficiency_report import build_efficiency_report, format_efficiency_report
 from factorio_optimizer.rates.module_rate import build_module_rate_report
 from factorio_optimizer.rates.rate_report import build_machine_rate_report
+from factorio_optimizer.rates.throughput_checks import build_transport_belt_v0_throughput_report
 from factorio_optimizer.render.ascii_renderer import render_ascii
 from factorio_optimizer.scoring.basic_fitness import score_plan
 from factorio_optimizer.validation.connection_validator import validate_modules_connections
@@ -240,6 +242,13 @@ def run_efficiency_reports() -> None:
     )
 
 
+def run_bottleneck_reports() -> None:
+    print()
+    print("# Throughput bottleneck reports")
+    print("=" * 40)
+    print(format_bottleneck_report(build_transport_belt_v0_throughput_report()))
+
+
 def main() -> None:
     run_legacy_object_flow_pipeline()
     run_module_pipeline()
@@ -248,6 +257,7 @@ def main() -> None:
     run_rate_reports()
     run_module_rate_reports()
     run_efficiency_reports()
+    run_bottleneck_reports()
 
 
 if __name__ == "__main__":
