@@ -4,45 +4,34 @@ from dataclasses import dataclass
 from math import ceil
 
 from factorio_optimizer.data.items import is_raw_resource
-from factorio_optimizer.data.machines import Machine, get_best_machine_for_category, get_machine
+from factorio_optimizer.data.machines import Machine, get_machine
 from factorio_optimizer.data.modules import ModuleConfig, compute_module_effects
-from factorio_optimizer.data.recipes import RECIPES, has_recipe
+from factorio_optimizer.data.recipes import has_recipe
 
-
-# ── Data structures ──────────────────────────────────────────────────────────
 
 @dataclass
 class ChainNode:
-    """One production step in the resolved factory chain."""
     item: str
     display_name: str
     icon: str
     machine_name: str
     machine_display_name: str
     recipe_name: str
-
-    # Rate math
-    target_per_second: float        # what the parent chain demands
-    machine_count_exact: float      # exact machines needed (e.g. 2.4)
-    machine_count_ceil: int         # ceil → actual machines placed (e.g. 3)
-    uptime_pct: float               # exact / ceil (e.g. 0.80 = 80%)
-    output_per_second: float        # capacity output (at ceil machines)
-    capacity_per_second: float      # same as output_per_second
-
-    # Energy
-    base_power_kw: float            # machine base power × ceil
-    effective_power_kw: float       # after module energy bonus
-
-    # Module effects applied
+    target_per_second: float
+    machine_count_exact: float
+    machine_count_ceil: int
+    uptime_pct: float
+    output_per_second: float
+    capacity_per_second: float
+    base_power_kw: float
+    effective_power_kw: float
     speed_bonus: float
     productivity_bonus: float
     energy_bonus: float
-
-    # Flags
-    is_raw: bool                    # True if this is a raw resource leaf
-    is_blackbox: bool               # True if this is a modular saved layout
-    blackbox_raw_inputs: dict[str, float] # Pre-calculated raw inputs for blackbox
-    children: list[ChainNode]       # ingredient sub-chains
+    is_raw: bool
+    is_blackbox: bool
+    blackbox_raw_inputs: dict[str, float]
+    children: list["ChainNode"]
 
 
 @dataclass
@@ -53,12 +42,9 @@ class ProductionChain:
     target_per_minute: float
     total_machines: int
     total_energy_kw: float
-    efficiency_kw_per_output: float  # kW per item/s
+    efficiency_kw_per_output: float
 
 
-# ── Solver ───────────────────────────────────────────────────────────────────
-
-# Default machine tiers for each recipe category
 _CATEGORY_TO_MACHINE: dict[str, dict[str, str]] = {
     "smelting": {
         "early": "stone_furnace",
@@ -89,11 +75,35 @@ _CATEGORY_TO_MACHINE: dict[str, dict[str, str]] = {
 }
 
 
+_RECIPE_CATEGORY_OVERRIDES: dict[str, str] = {
+    # Crafted in assemblers. The ingredient sulfuric_acid is a fluid, but the recipe category is not chemistry.
+    "chemical_science_pack": "crafting-with-fluid",
+}
+
+
+def _recipe_category(recipe_name: str, recipe_category: str) -> str:
+    return _RECIPE_CATEGORY_OVERRIDES.get(recipe_name, recipe_category)
+
+
 def _pick_machine(category: str, era: str, use_electric_furnace: bool = False) -> str:
-    tier_map = _CATEGORY_TO_MACHINE.get(category, {})
+    tier_map = _CATEGORY_TO_MACHINE.get(category)
+    if tier_map is None:
+        raise ValueError(f"No machine tier map registered for recipe category {category!r}.")
     if category == "smelting" and use_electric_furnace and era in ("mid", "end"):
         return tier_map.get("mid_electric", "stone_furnace")
-    return tier_map.get(era, tier_map.get("early", "assembling_machine_1"))
+    if era not in tier_map:
+        raise ValueError(f"No machine registered for category {category!r} in era {era!r}.")
+    return tier_map[era]
+
+
+def _get_valid_machine(machine_name: str, category: str, recipe_name: str) -> Machine:
+    machine = get_machine(machine_name)
+    if category not in machine.allowed_categories:
+        raise ValueError(
+            f"Machine {machine.name!r} cannot craft recipe {recipe_name!r} "
+            f"with category {category!r}. Allowed categories: {machine.allowed_categories}."
+        )
+    return machine
 
 
 def _compute_single_machine_rate(
@@ -101,25 +111,24 @@ def _compute_single_machine_rate(
     machine: Machine,
     modules: list[ModuleConfig],
 ) -> tuple[float, float, float, float, float, float]:
-    """
-    Return (output_per_second_per_machine, speed_bonus, productivity_bonus,
-            energy_bonus, effective_speed, effective_power_kw_per_machine).
-    """
     from factorio_optimizer.data.recipes import get_recipe
-    recipe = get_recipe(recipe_name)
 
+    recipe = get_recipe(recipe_name)
     speed_b, prod_b, energy_b = compute_module_effects(modules, machine.machine_type)
     effective_speed = machine.crafting_speed * (1.0 + speed_b)
     effective_power = machine.power_kw * (1.0 + energy_b)
-
-    # crafts per second
     crafts_per_second = effective_speed / recipe.crafting_time_seconds
 
-    # output per second per machine (considering multi-output + productivity)
-    output_item = list(recipe.outputs.keys())[0]  # primary output
-    output_amount = recipe.outputs[output_item]
-    output_per_second = crafts_per_second * output_amount * (1.0 + prod_b)
+    if recipe_name not in recipe.outputs:
+        if len(recipe.outputs) != 1:
+            raise NotImplementedError(
+                f"Recipe {recipe_name!r} has multiple outputs and cannot be solved as item {recipe_name!r} yet."
+            )
+        output_amount = next(iter(recipe.outputs.values()))
+    else:
+        output_amount = recipe.outputs[recipe_name]
 
+    output_per_second = crafts_per_second * output_amount * (1.0 + prod_b)
     return output_per_second, speed_b, prod_b, energy_b, effective_speed, effective_power
 
 
@@ -132,32 +141,21 @@ def solve_chain(
     saved_layouts: dict[str, dict] | None = None,
     _visited: set[str] | None = None,
 ) -> ChainNode:
-    """
-    Recursively solve the production chain for `item` at `target_per_second`.
-    """
-    from factorio_optimizer.data.items import get_item, ITEMS
+    from factorio_optimizer.data.items import get_item
     from factorio_optimizer.data.recipes import get_recipe
 
-    if modules is None:
-        modules = []
-    if _visited is None:
-        _visited = set()
-    if saved_layouts is None:
-        saved_layouts = {}
-
+    modules = modules or []
+    _visited = _visited or set()
+    saved_layouts = saved_layouts or {}
     item_meta = get_item(item)
 
-    # ── Modular Blackbox leaf ────────────────────────────────────────────
     if item in saved_layouts and item not in _visited:
         layout = saved_layouts[item]
         output_per_second_each = layout.get("target_per_second", 1.0)
         base_power_each = layout.get("total_energy_kw", 0.0)
-        
         machine_count_exact = target_per_second / output_per_second_each if output_per_second_each else 0.0
         machine_count_ceil = max(1, ceil(machine_count_exact))
         uptime_pct = machine_count_exact / machine_count_ceil if machine_count_ceil > 0 else 1.0
-        
-        # Scale the raw inputs from the saved layout
         raw_inputs_each = layout.get("raw_inputs", {})
         scaled_raw_inputs = {k: v * machine_count_exact for k, v in raw_inputs_each.items()}
 
@@ -185,7 +183,6 @@ def solve_chain(
             children=[],
         )
 
-    # ── Raw resource leaf ────────────────────────────────────────────────
     if is_raw_resource(item) or not has_recipe(item) or item in _visited:
         return ChainNode(
             item=item,
@@ -211,27 +208,18 @@ def solve_chain(
             children=[],
         )
 
-    # ── Find recipe and machine ──────────────────────────────────────────
     _visited = _visited | {item}
-
     recipe = get_recipe(item)
-    machine_name = _pick_machine(recipe.category, era, use_electric_furnace)
-    try:
-        machine = get_machine(machine_name)
-    except ValueError:
-        machine_name = "assembling_machine_1"
-        machine = get_machine(machine_name)
+    category = _recipe_category(item, recipe.category)
+    machine_name = _pick_machine(category, era, use_electric_furnace)
+    machine = _get_valid_machine(machine_name, category, item)
 
-    # Filter modules: only those allowed for this machine type
     applicable_modules = [
         cfg for cfg in modules
         if machine.machine_type in cfg.module.allowed_machine_types
-        and cfg.count <= machine.module_slots
     ]
-    # Clamp total module count to available slots
     total_slots_used = sum(cfg.count for cfg in applicable_modules)
     if total_slots_used > machine.module_slots:
-        # Reduce last entry to fit
         clamped: list[ModuleConfig] = []
         slots_remaining = machine.module_slots
         for cfg in applicable_modules:
@@ -242,34 +230,27 @@ def solve_chain(
             slots_remaining -= use
         applicable_modules = clamped
 
-    (
-        output_per_second_each,
-        speed_b, prod_b, energy_b,
-        _eff_speed, effective_power_each,
-    ) = _compute_single_machine_rate(item, machine, applicable_modules)
+    output_per_second_each, speed_b, prod_b, energy_b, _eff_speed, effective_power_each = _compute_single_machine_rate(
+        item,
+        machine,
+        applicable_modules,
+    )
 
-    # Number of machines needed
     machine_count_exact = target_per_second / output_per_second_each
     machine_count_ceil = max(1, ceil(machine_count_exact))
     uptime_pct = machine_count_exact / machine_count_ceil
-
     capacity_per_second = output_per_second_each * machine_count_ceil
     base_power = machine.power_kw * machine_count_ceil
     effective_power = effective_power_each * machine_count_ceil
 
-    # ── Resolve ingredient sub-chains ────────────────────────────────────
-    # We need to produce `target_per_second` of `item`.
-    # How many crafts/second does that require?
     output_amount = recipe.outputs[item]
-    # With productivity, each craft yields output_amount × (1 + prod_b)
     crafts_per_second_needed = target_per_second / (output_amount * (1.0 + prod_b))
 
     children: list[ChainNode] = []
     for ingredient, amount_per_craft in recipe.inputs.items():
-        ingredient_rate = amount_per_craft * crafts_per_second_needed
         child = solve_chain(
             item=ingredient,
-            target_per_second=ingredient_rate,
+            target_per_second=amount_per_craft * crafts_per_second_needed,
             era=era,
             modules=modules,
             use_electric_furnace=use_electric_furnace,
@@ -303,14 +284,9 @@ def solve_chain(
     )
 
 
-# ── Aggregation helpers ───────────────────────────────────────────────────────
-
 def total_machines(node: ChainNode) -> int:
     if node.is_raw:
         return 0
-    # For a blackbox, it's treated as 1 "blueprint" machine conceptually, 
-    # but practically we might want to return 0 or the machine_count_ceil. 
-    # Let's count it as `machine_count_ceil` modular setups.
     return node.machine_count_ceil + sum(total_machines(c) for c in node.children)
 
 
@@ -321,7 +297,6 @@ def total_energy_kw(node: ChainNode) -> float:
 
 
 def collect_raw_inputs(node: ChainNode) -> dict[str, float]:
-    """Collect all raw resource requirements (items/second) from the chain."""
     result: dict[str, float] = {}
     if node.is_raw:
         result[node.item] = result.get(node.item, 0.0) + node.target_per_second
@@ -366,7 +341,6 @@ def build_production_chain(
 
 
 def chain_node_to_dict(node: ChainNode) -> dict:
-    """Serialize a ChainNode to a JSON-safe dict for the web API."""
     return {
         "item": node.item,
         "display_name": node.display_name,
