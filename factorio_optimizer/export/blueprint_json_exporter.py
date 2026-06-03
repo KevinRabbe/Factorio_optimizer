@@ -16,6 +16,7 @@ ENTITY_NAMES = {
     "belt": "transport-belt",
     "inserter": "inserter",
     "assembler": "assembling-machine-1",
+    "splitter": "splitter",
 }
 
 # Factorio 2.0+ blueprint version used as a placeholder for now.
