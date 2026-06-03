@@ -36,4 +36,7 @@ def _symbol_for_object(object_type: str, role: str | None) -> str:
     if object_type == "belt":
         return ">"
 
+    if object_type == "splitter":
+        return "S"
+
     return "?"
