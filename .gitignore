@@ -14,3 +14,5 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+runtime/
+factorio_optimizer/data/saved_layouts.json
