@@ -92,21 +92,29 @@ def _validate_flows(plan: BlueprintPlan, result: ValidationResult) -> None:
 
 
 def _validate_iron_gear_logic(plan: BlueprintPlan, result: ValidationResult) -> None:
-    assembler = plan.get_object("gear_maker")
-    if assembler is None:
-        result.add_error("Missing gear_maker assembler.")
-        return
+    assemblers = [
+        obj
+        for obj in plan.objects
+        if obj.object_type == "assembler" and obj.recipe == "iron_gear_wheel"
+    ]
+    if not assemblers:
+        result.add_error("Missing assembler with iron_gear_wheel recipe.")
 
-    if assembler.recipe != "iron_gear_wheel":
-        result.add_error("gear_maker has wrong recipe.")
+    iron_inputs = [
+        obj
+        for obj in plan.objects
+        if obj.object_type == "input_interface" and obj.item == "iron_plate"
+    ]
+    if not iron_inputs:
+        result.add_error("Missing iron_plate input interface.")
 
-    iron_input = plan.get_object("iron_input")
-    if iron_input is None or iron_input.item != "iron_plate":
-        result.add_error("Missing iron_plate input.")
-
-    gear_output = plan.get_object("gear_output")
-    if gear_output is None or gear_output.item != "iron_gear_wheel":
-        result.add_error("Missing iron_gear_wheel output.")
+    gear_outputs = [
+        obj
+        for obj in plan.objects
+        if obj.object_type == "output_interface" and obj.item == "iron_gear_wheel"
+    ]
+    if not gear_outputs:
+        result.add_error("Missing iron_gear_wheel output interface.")
 
     input_flow = next(
         (flow for flow in plan.flows if flow.flow_id == "iron_to_assembler"),
