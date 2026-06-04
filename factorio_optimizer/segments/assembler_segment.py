@@ -31,6 +31,7 @@ class AssemblerSegment(Segment):
                 height=self.height,
                 recipe=self.recipe,
                 role="producer",
+                entity_name=self.machine_type.replace("_", "-"),
             )
         ]
 
@@ -72,6 +73,7 @@ def create_assembler_segment(
     input_items: tuple[str, ...],
     output_item: str,
     position: Position,
+    machine_type: str = "assembling_machine_1",
     direction: Direction = "north",
 ) -> AssemblerSegment:
     return AssemblerSegment(
@@ -82,4 +84,5 @@ def create_assembler_segment(
         recipe=recipe,
         input_items=input_items,
         output_item=output_item,
+        machine_type=machine_type,
     )
