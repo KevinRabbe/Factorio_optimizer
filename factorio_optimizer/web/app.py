@@ -61,6 +61,8 @@ def api_optimize():
     power_mode = data.get("power_mode", "external")
     raw_modules = data.get("modules", [])
     seed = int(data.get("seed", 0))
+    use_electric_furnace = bool(data.get("use_electric_furnace", False))
+    compare_furnace_modes = bool(data.get("compare_furnace_modes", False))
 
     if unit == "per_minute":
         rate_ps = rate / 60.0
@@ -78,11 +80,16 @@ def api_optimize():
         except (ValueError, KeyError):
             continue
 
-    furnace_mode = "compared"
-    furnace_mode_note = "Mid/end plans compare available steel/electric furnace alternatives automatically."
-    if era == "early":
-        furnace_mode = "burner_only"
-        furnace_mode_note = "Early-game plans use burner furnaces only."
+    furnace_mode = _furnace_mode_label(
+        era=era,
+        use_electric_furnace=use_electric_furnace,
+        compare_furnace_modes=compare_furnace_modes,
+    )
+    furnace_mode_note = _furnace_mode_note(
+        era=era,
+        use_electric_furnace=use_electric_furnace,
+        compare_furnace_modes=compare_furnace_modes,
+    )
 
     try:
         report = compile_optimization_request(
@@ -92,6 +99,8 @@ def api_optimize():
                 era=era,
                 power_mode=power_mode,
                 module_configs=module_configs,
+                use_electric_furnace=use_electric_furnace,
+                compare_furnace_modes=compare_furnace_modes,
                 config=GenerationConfig(seed=seed, era=era, power_mode=power_mode),
             )
         )
@@ -108,6 +117,8 @@ def api_optimize():
         "unit": unit,
         "rate_per_second": round(rate_ps, 6),
         "era": era,
+        "use_electric_furnace": use_electric_furnace,
+        "compare_furnace_modes": compare_furnace_modes,
         "furnace_mode": furnace_mode,
         "furnace_mode_note": furnace_mode_note,
         "plans": plans[:5],
@@ -118,6 +129,24 @@ def api_optimize():
         "summary": report_dict["summary"],
         "diagnostics": report_dict["diagnostics"],
     })
+
+
+def _furnace_mode_label(era: str, use_electric_furnace: bool, compare_furnace_modes: bool) -> str:
+    if era == "early":
+        return "burner_only"
+    if compare_furnace_modes:
+        return "compared"
+    return "electric_furnace" if use_electric_furnace else "burner_furnace"
+
+
+def _furnace_mode_note(era: str, use_electric_furnace: bool, compare_furnace_modes: bool) -> str:
+    if era == "early":
+        return "Early-game plans use burner furnaces only."
+    if compare_furnace_modes:
+        return "Plans compare available burner/electric furnace alternatives automatically."
+    if use_electric_furnace:
+        return "Plans respect the selected electric furnace mode."
+    return "Plans respect the selected burner/steel furnace mode."
 
 
 @app.route("/api/layouts", methods=["GET"])
