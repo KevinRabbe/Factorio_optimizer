@@ -325,6 +325,7 @@ async function runGenerateModuleBlueprint() {
       body: JSON.stringify({
         recipe_name: state.selectedItem.name,
         era: state.machineEra,
+        machine_name: selectedBlueprintMachineName(),
         seed: 0,
       }),
     });
@@ -340,6 +341,37 @@ async function runGenerateModuleBlueprint() {
     if (btn) btn.disabled = !state.selectedItem;
     if (text) text.textContent = oldText || `Generate Blueprint — ${state.selectedItem?.display_name || ''}`;
   }
+}
+
+function selectedBlueprintMachineName() {
+  const category = state.selectedItem?.category || '';
+  const era = state.machineEra || 'early';
+
+  if (category === 'raw') return null;
+  if (category === 'intermediate' && isLikelySmeltingRecipe(state.selectedItem?.name)) {
+    return selectedFurnaceMachineName();
+  }
+
+  if (era === 'early') return 'assembling_machine_1';
+  if (era === 'mid') return 'assembling_machine_2';
+  if (era === 'end') return 'assembling_machine_3';
+  return 'assembling_machine_1';
+}
+
+function selectedFurnaceMachineName() {
+  const era = state.machineEra || 'early';
+  if (era === 'early') return 'stone_furnace';
+  if (state.useElectricFurnace) return 'electric_furnace';
+  return 'steel_furnace';
+}
+
+function isLikelySmeltingRecipe(itemName) {
+  return [
+    'iron_plate',
+    'copper_plate',
+    'steel_plate',
+    'stone_brick',
+  ].includes(itemName);
 }
 
 function renderModuleBlueprintReport(report) {
