@@ -33,7 +33,7 @@ def export_plan_to_blueprint_json(plan: BlueprintPlan) -> dict[str, Any]:
         if obj.object_type in {"input_interface", "output_interface"}:
             continue
 
-        entity_name = ENTITY_NAMES.get(obj.object_type)
+        entity_name = obj.entity_name or ENTITY_NAMES.get(obj.object_type)
         if entity_name is None:
             continue
 
