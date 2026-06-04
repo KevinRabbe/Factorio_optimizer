@@ -4,6 +4,10 @@ import os
 
 from flask import Flask, jsonify, request, send_from_directory
 
+from factorio_optimizer.compiler.module_blueprint_compiler import (
+    ModuleBlueprintRequest,
+    compile_module_blueprint,
+)
 from factorio_optimizer.compiler.request import OptimizationRequest
 from factorio_optimizer.compiler.simple_compiler import compile_optimization_request
 from factorio_optimizer.config.generation_config import GenerationConfig
@@ -129,6 +133,33 @@ def api_optimize():
         "summary": report_dict["summary"],
         "diagnostics": report_dict["diagnostics"],
     })
+
+
+@app.route("/api/generate-module-blueprint", methods=["POST"])
+def api_generate_module_blueprint():
+    data = request.get_json(force=True, silent=True) or {}
+
+    recipe_name = data.get("recipe_name") or data.get("item")
+    if not recipe_name:
+        return jsonify({"error": "Missing recipe_name or item."}), 400
+
+    era = data.get("era", "early")
+    machine_name = data.get("machine_name") or None
+    seed = int(data.get("seed", 0))
+
+    try:
+        report = compile_module_blueprint(
+            ModuleBlueprintRequest(
+                recipe_name=recipe_name,
+                era=era,
+                machine_name=machine_name,
+                seed=seed,
+            )
+        )
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify(report.to_dict())
 
 
 def _furnace_mode_label(era: str, use_electric_furnace: bool, compare_furnace_modes: bool) -> str:
