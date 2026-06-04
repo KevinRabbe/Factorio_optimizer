@@ -23,6 +23,8 @@ function normalizeOptimizationResponse(data) {
     targetRatePerSecond: report?.target_rate_per_second ?? data.rate_per_second ?? bestPlan?.target_per_second ?? 0,
     targetRatePerMinute: report?.target_rate_per_minute ?? ((data.rate_per_second ?? 0) * 60),
     targetRatePerHour: report?.target_rate_per_hour ?? ((data.rate_per_second ?? 0) * 3600),
+    bottlenecks: diagnostics.bottlenecks || [],
+    bottleneckSummary: diagnostics.bottleneck_summary || summary.bottleneck_summary || {},
   };
 }
 
@@ -45,7 +47,7 @@ function renderResults(data) {
 
   renderSummaryCards(best, normalized.raw);
   renderTargetDiagnostics(best, normalized);
-  renderBottleneckDiagnostics(best);
+  renderBottleneckDiagnostics(best, normalized);
 
   if (best.chain) {
     renderChainTree(best.chain);
@@ -125,13 +127,16 @@ function renderTargetDiagnostics(best, normalized) {
   chainTree.appendChild(diagnostics);
 }
 
-function renderBottleneckDiagnostics(best) {
+function renderBottleneckDiagnostics(best, normalized) {
   const chainTree = document.getElementById('chain-tree');
   if (!chainTree || !best?.chain) return;
 
-  const candidates = collectBottleneckCandidates(best.chain);
-  const critical = candidates.filter(candidate => candidate.level === 'critical');
-  const warnings = candidates.filter(candidate => candidate.level === 'warning');
+  const candidates = normalized.bottlenecks && normalized.bottlenecks.length
+    ? normalized.bottlenecks.map(fromBackendBottleneck)
+    : collectBottleneckCandidates(best.chain);
+  const summary = normalized.bottleneckSummary || {};
+  const criticalCount = summary.critical_count ?? candidates.filter(candidate => candidate.level === 'critical').length;
+  const warningCount = summary.warning_count ?? candidates.filter(candidate => candidate.level === 'warning').length;
   const shown = candidates.slice(0, 6);
 
   const diagnostics = document.createElement('div');
@@ -166,11 +171,11 @@ function renderBottleneckDiagnostics(best) {
 
   diagnostics.innerHTML = `
     <div class="chain-node-header">
-      <span class="cn-icon">${critical.length ? '🚧' : '⚠️'}</span>
+      <span class="cn-icon">${criticalCount ? '🚧' : '⚠️'}</span>
       <div class="cn-info">
         <div class="cn-name">Bottleneck / Ratio Check</div>
         <div class="cn-machine">
-          ${critical.length} critical · ${warnings.length} warning · critical below 70%, warning below 90% uptime.
+          ${criticalCount} critical · ${warningCount} warning · backend report preferred, UI fallback available.
         </div>
       </div>
       <div class="cn-stats">
@@ -194,6 +199,23 @@ function renderChainTree(node, depth = 0) {
     container.appendChild(nodeEl);
   }
   return nodeEl;
+}
+
+function fromBackendBottleneck(item) {
+  const level = item.level || 'warning';
+  return {
+    item: item.item,
+    displayName: item.display_name || item.item,
+    icon: item.icon || '⚙️',
+    exact: Number(item.exact_machines || 0),
+    built: Number(item.built_machines || 0),
+    uptime: Number(item.uptime_pct || 0),
+    roundingWaste: Number(item.rounding_waste_pct || 0) / 100,
+    level,
+    badge: level === 'critical' ? '🚨' : '⚠️',
+    reason: item.reason || 'backend bottleneck diagnostic',
+    severity: Number(item.severity || 0),
+  };
 }
 
 function collectBottleneckCandidates(root) {
