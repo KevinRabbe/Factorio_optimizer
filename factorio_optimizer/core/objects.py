@@ -10,6 +10,7 @@ ObjectType = Literal[
     "input_interface",
     "output_interface",
     "assembler",
+    "furnace",
     "inserter",
     "belt",
     "splitter",
