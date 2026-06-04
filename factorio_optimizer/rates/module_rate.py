@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from factorio_optimizer.modules.module_base import FactoryModule
-from factorio_optimizer.rates.machine_rate import MachineRecipeRate, calculate_machine_recipe_rate
 from factorio_optimizer.data.machines import get_machine
 from factorio_optimizer.data.recipes import get_recipe
+from factorio_optimizer.modules.module_base import FactoryModule
+from factorio_optimizer.rates.machine_rate import MachineRecipeRate, calculate_machine_recipe_rate
 
 
 @dataclass(frozen=True)
@@ -36,15 +36,24 @@ MODULE_RATE_SPECS: dict[str, ModuleRateSpec] = {
 
 
 def calculate_module_theoretical_rate(module: FactoryModule) -> MachineRecipeRate:
+    recipe_name, machine_name, machine_count = _resolve_module_rate_inputs(module)
+
+    return calculate_machine_recipe_rate(
+        recipe=get_recipe(recipe_name),
+        machine=get_machine(machine_name),
+        machine_count=machine_count,
+    )
+
+
+def _resolve_module_rate_inputs(module: FactoryModule) -> tuple[str, str, int]:
+    if module.recipe_name is not None and module.machine_name is not None:
+        return module.recipe_name, module.machine_name, 1
+
     spec = MODULE_RATE_SPECS.get(module.module_type)
     if spec is None:
         raise ValueError(f"No module rate spec registered for module type {module.module_type}.")
 
-    return calculate_machine_recipe_rate(
-        recipe=get_recipe(spec.primary_recipe),
-        machine=get_machine(spec.primary_machine),
-        machine_count=spec.machine_count,
-    )
+    return spec.primary_recipe, spec.primary_machine, spec.machine_count
 
 
 def build_module_rate_report(module: FactoryModule) -> str:
