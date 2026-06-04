@@ -71,6 +71,7 @@ def build_generic_assembler_module(
         input_items=input_items,
         output_item=output_item,
         position=Position(assembler_x, assembler_y),
+        machine_type=machine_name,
     )
     segments.append(assembler)
 
