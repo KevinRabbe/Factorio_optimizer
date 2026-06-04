@@ -17,6 +17,8 @@ class ProductionDiagnostic:
     item: str
     display_name: str
     icon: str
+    machine_name: str
+    machine_display_name: str
     kind: DiagnosticKind
     level: DiagnosticLevel
     reason: str
@@ -35,6 +37,8 @@ class ProductionDiagnostic:
             "item": self.item,
             "display_name": self.display_name,
             "icon": self.icon,
+            "machine_name": self.machine_name,
+            "machine_display_name": self.machine_display_name,
             "kind": self.kind,
             "level": self.level,
             "reason": self.reason,
@@ -130,6 +134,8 @@ def _build_node_diagnostic(
     is_critical_uptime = 0.0 < uptime_pct < 70.0
     is_warning_uptime = 70.0 <= uptime_pct < 90.0
     is_wasteful_rounding = rounding_waste > 30.0
+    machine_name = str(node.get("machine_name", ""))
+    machine_display_name = str(node.get("machine_display_name", machine_name or "machine"))
 
     if is_final_target:
         if not (is_critical_uptime or is_warning_uptime or is_wasteful_rounding):
@@ -137,7 +143,12 @@ def _build_node_diagnostic(
         level: DiagnosticLevel = "critical" if is_critical_uptime else "warning"
         reason = _final_reason(is_critical_uptime, is_warning_uptime)
         kind: DiagnosticKind = "final_production_requirement"
-        recommendation = _final_recommendation(built_machines, uptime_pct, rounding_waste)
+        recommendation = _final_recommendation(
+            machine_display_name=machine_display_name,
+            built_machines=built_machines,
+            uptime_pct=uptime_pct,
+            rounding_waste=rounding_waste,
+        )
         severity = (100.0 - uptime_pct) + (rounding_waste * 0.5) + (100.0 if level == "critical" else 25.0)
     else:
         if not (is_critical_uptime or is_warning_uptime or is_wasteful_rounding):
@@ -147,6 +158,7 @@ def _build_node_diagnostic(
         reason = "upstream production scaling requirement"
         recommendation = _upstream_recommendation(
             display_name=str(node.get("display_name", node.get("item", "this item"))),
+            machine_display_name=machine_display_name,
             built_machines=built_machines,
             target_per_minute=target_per_minute,
         )
@@ -156,6 +168,8 @@ def _build_node_diagnostic(
         item=str(node.get("item", "")),
         display_name=str(node.get("display_name", node.get("item", "unknown"))),
         icon=str(node.get("icon", "⚙️")),
+        machine_name=machine_name,
+        machine_display_name=machine_display_name,
         kind=kind,
         level=level,
         reason=reason,
@@ -185,16 +199,32 @@ def _final_reason(is_critical: bool, is_warning: bool) -> str:
     return "final crafting process has rounding waste from ceil(machine count)"
 
 
-def _final_recommendation(built_machines: int, uptime_pct: float, rounding_waste: float) -> str:
+def _final_recommendation(
+    machine_display_name: str,
+    built_machines: int,
+    uptime_pct: float,
+    rounding_waste: float,
+) -> str:
     if uptime_pct < 70.0:
-        return f"Build at least {built_machines} final machines, then check belts/inserters feeding the final recipe."
+        return (
+            f"Build at least {built_machines} {machine_display_name}(s) for the final recipe, "
+            "then check belts/inserters feeding the final process."
+        )
     if rounding_waste > 30.0:
-        return "This is mostly rounding waste. Increase target rate or accept idle time for a cleaner small factory."
-    return f"Build {built_machines} final machines. This is a ratio warning, not necessarily a broken factory."
+        return (
+            f"Use {built_machines} {machine_display_name}(s), or increase the target rate "
+            "to reduce idle time from machine rounding."
+        )
+    return f"Build {built_machines} {machine_display_name}(s). This is a ratio warning, not a broken factory."
 
 
-def _upstream_recommendation(display_name: str, built_machines: int, target_per_minute: float) -> str:
+def _upstream_recommendation(
+    display_name: str,
+    machine_display_name: str,
+    built_machines: int,
+    target_per_minute: float,
+) -> str:
     return (
-        f"Scale {display_name} production to {target_per_minute:.2f}/min "
-        f"by building {built_machines} upstream machine(s) or module copy/copies."
+        f"Scale {display_name} to {target_per_minute:.2f}/min by building "
+        f"{built_machines} {machine_display_name}(s) or module copy/copies."
     )
