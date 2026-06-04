@@ -27,7 +27,12 @@ def compile_optimization_request(request: OptimizationRequest) -> OptimizationRe
 
     bottlenecks = build_bottleneck_diagnostics(best_plan)
     bottleneck_summary = build_bottleneck_summary(bottlenecks)
-    transport = build_transport_diagnostics(best_plan, request.era)
+    transport = build_transport_diagnostics(
+        best_plan,
+        request.era,
+        belt_name=request.belt_name,
+        inserter_name=request.inserter_name,
+    )
     transport_summary = build_transport_summary(transport)
     summary = _build_summary(
         best_plan=best_plan,
@@ -37,10 +42,12 @@ def compile_optimization_request(request: OptimizationRequest) -> OptimizationRe
     )
     diagnostics = {
         "compiler": "simple_compiler",
-        "report_schema_version": 4,
+        "report_schema_version": 5,
         "deterministic_seed": request.config.seed,
         "use_electric_furnace": request.use_electric_furnace,
         "compare_furnace_modes": request.compare_furnace_modes,
+        "belt_name": request.belt_name,
+        "inserter_name": request.inserter_name,
         "bottlenecks": bottlenecks,
         "bottleneck_summary": bottleneck_summary,
         "transport": transport,
