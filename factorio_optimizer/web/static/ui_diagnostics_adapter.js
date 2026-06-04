@@ -4,13 +4,18 @@
   Backend diagnostics now classify final-process requirements separately from
   upstream scaling requirements. This renderer makes that visible in the UI:
   upstream gears/cables/plates are shown as "scale production", not as hard
-  bottlenecks.
+  bottlenecks. It also renders transport/inserter capacity diagnostics.
 */
 
 function renderBottleneckDiagnostics(best, normalized) {
   const chainTree = document.getElementById('chain-tree');
   if (!chainTree || !best?.chain) return;
 
+  renderProductionDiagnostics(chainTree, best, normalized);
+  renderTransportDiagnostics(chainTree, normalized);
+}
+
+function renderProductionDiagnostics(chainTree, best, normalized) {
   const candidates = normalized.bottlenecks && normalized.bottlenecks.length
     ? normalized.bottlenecks.map(fromBackendBottleneck)
     : collectBottleneckCandidates(best.chain);
@@ -88,6 +93,67 @@ function renderBottleneckDiagnostics(best, normalized) {
   chainTree.appendChild(diagnostics);
 }
 
+function renderTransportDiagnostics(chainTree, normalized) {
+  const transport = normalized.diagnostics?.transport || [];
+  const summary = normalized.diagnostics?.transport_summary || normalized.summary?.transport_summary || {};
+  const relevant = transport
+    .filter(item => item.level === 'critical' || item.level === 'warning')
+    .slice(0, 8);
+
+  const diagnostics = document.createElement('div');
+  diagnostics.className = 'chain-node';
+  diagnostics.style.marginBottom = '10px';
+
+  if (!relevant.length) {
+    diagnostics.innerHTML = `
+      <div class="chain-node-header">
+        <span class="cn-icon">✅</span>
+        <div class="cn-info">
+          <div class="cn-name">Transport / Inserter Diagnostics</div>
+          <div class="cn-machine">No belt or inserter saturation warnings found at the current target rate.</div>
+        </div>
+        <div class="cn-stats">
+          <span class="cn-count">stable</span>
+          <span class="cn-rate">flow</span>
+        </div>
+      </div>`;
+    chainTree.appendChild(diagnostics);
+    return;
+  }
+
+  const rows = relevant.map(item => `
+    <div class="cn-energy">
+      ${transportBadge(item)} ${escapeHtml(item.icon || '📦')} <strong>${escapeHtml(item.display_name || item.item)}</strong>
+      &nbsp;·&nbsp; ${transportKindLabel(item.kind)}
+      &nbsp;·&nbsp; ${Number(item.required_per_second || 0).toFixed(2)}/s
+      &nbsp;·&nbsp; ${Number(item.utilization_pct || 0).toFixed(1)}% of ${escapeHtml(item.selected_entity || 'entity')}
+      <br><span style="opacity:0.85">➡️ ${escapeHtml(item.recommendation || '')}</span>
+    </div>
+  `).join('');
+
+  const criticalCount = summary.critical_count ?? relevant.filter(item => item.level === 'critical').length;
+  const warningCount = summary.warning_count ?? relevant.filter(item => item.level === 'warning').length;
+  const icon = criticalCount ? '🚧' : '⚠️';
+
+  diagnostics.innerHTML = `
+    <div class="chain-node-header">
+      <span class="cn-icon">${icon}</span>
+      <div class="cn-info">
+        <div class="cn-name">Transport / Inserter Diagnostics</div>
+        <div class="cn-machine">
+          ${criticalCount} critical · ${warningCount} warning · checks belt and inserter item/s limits.
+        </div>
+      </div>
+      <div class="cn-stats">
+        <span class="cn-count">${relevant.length} shown</span>
+        <span class="cn-rate">flow</span>
+      </div>
+    </div>
+    ${rows}`;
+
+  chainTree.appendChild(diagnostics);
+}
+
 function fromBackendBottleneck(item) {
   const kind = item.kind || 'ratio_inefficiency';
   const level = item.level || 'warning';
@@ -115,6 +181,18 @@ function badgeForDiagnostic(kind, level) {
   if (level === 'critical') return '🚨';
   if (level === 'warning') return '⚠️';
   return 'ℹ️';
+}
+
+function transportBadge(item) {
+  if (item.level === 'critical') return '🚨';
+  if (item.level === 'warning') return '⚠️';
+  return '✅';
+}
+
+function transportKindLabel(kind) {
+  if (kind === 'belt_capacity') return 'belt capacity';
+  if (kind === 'inserter_capacity') return 'inserter capacity';
+  return kind || 'transport capacity';
 }
 
 function reasonForDiagnostic(kind, level) {
