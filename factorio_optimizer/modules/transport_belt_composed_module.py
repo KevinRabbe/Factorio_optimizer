@@ -3,7 +3,7 @@ from __future__ import annotations
 from factorio_optimizer.core.objects import Position
 from factorio_optimizer.modules.connections import ModuleConnection
 from factorio_optimizer.modules.iron_gear_module import build_iron_gear_module
-from factorio_optimizer.modules.module_base import FactoryModule, ModuleRate
+from factorio_optimizer.modules.module_base import FactoryModule, Footprint, ModuleRate
 from factorio_optimizer.segments.assembler_segment import create_assembler_segment
 from factorio_optimizer.segments.belt_segment import create_belt_segment
 from factorio_optimizer.segments.inserter_segment import create_inserter_transfer_segment
@@ -110,18 +110,7 @@ def build_transport_belt_module_v1(
     input_ports = [port for segment in all_segments for port in segment.ports if port.kind == "input"]
     output_ports = [port for segment in all_segments for port in segment.ports if port.kind == "output"]
 
-    module = FactoryModule(
-        module_id=module_id,
-        module_type="transport_belt_module_v1",
-        position=origin,
-        input_ports=input_ports,
-        output_ports=output_ports,
-        input_rates=[ModuleRate(item="iron_plate", amount_per_second=2.0)],
-        output_rates=[ModuleRate(item="transport_belt", amount_per_second=1.0)],
-        segments=all_segments,
-    )
-
-    module.flow_links = [
+    flow_links = [
         ModuleConnection(
             flow_id="iron_plate_to_internal_gear_module",
             item="iron_plate",
@@ -174,4 +163,17 @@ def build_transport_belt_module_v1(
         ),
     ]
 
-    return module
+    return FactoryModule(
+        module_id=module_id,
+        module_type="transport_belt_module_v1",
+        position=origin,
+        input_ports=input_ports,
+        output_ports=output_ports,
+        input_rates=[ModuleRate(item="iron_plate", amount_per_second=3.0)],
+        output_rates=[ModuleRate(item="transport_belt", amount_per_second=2.0)],
+        segments=all_segments,
+        flow_links=flow_links,
+        recipe_name="transport_belt",
+        machine_name="assembling_machine_1",
+        footprint=Footprint(width=12, height=11),
+    )
