@@ -121,24 +121,30 @@ def compare_plans(
     target_per_second: float,
     era: str = "mid",
     user_modules: list[ModuleConfig] | None = None,
+    use_electric_furnace: bool = False,
+    compare_furnace_modes: bool = True,
 ) -> list[FactoryPlan]:
     """
     Generate and rank the top factory configurations for the given item and era.
-    Always includes the user's custom config as well as automatic alternatives.
+    Can either compare furnace modes automatically or respect a fixed furnace mode.
     """
     from factorio_optimizer.data.modules import ModuleConfig as MC, get_module
 
     plans: list[FactoryPlan] = []
+    furnace_modes = _furnace_modes_for_request(
+        era=era,
+        use_electric_furnace=use_electric_furnace,
+        compare_furnace_modes=compare_furnace_modes,
+    )
 
     # ── 1. No modules baseline ───────────────────────────────────────────
-    for electric in ([False, True] if era in ("mid", "end") else [False]):
+    for electric in furnace_modes:
         plans.append(optimize_factory(item, target_per_second, era, [], electric))
 
     # ── 2. User-specified modules config ─────────────────────────────────
     if user_modules:
-        plans.append(optimize_factory(item, target_per_second, era, user_modules, False))
-        if era in ("mid", "end"):
-            plans.append(optimize_factory(item, target_per_second, era, user_modules, True))
+        for electric in furnace_modes:
+            plans.append(optimize_factory(item, target_per_second, era, user_modules, electric))
 
     # ── 3. Pre-set mid-game alternatives ─────────────────────────────────
     if era == "mid":
@@ -146,26 +152,27 @@ def compare_plans(
         prod1 = get_module("productivity_module_1")
         eff1 = get_module("efficiency_module_1")
 
-        # Speed-focused (2× speed modules in assembler 2 = 2 slots)
-        plans.append(optimize_factory(
-            item, target_per_second, era,
-            [MC(speed1, 2)], False,
-        ))
-        # Productivity-focused
-        plans.append(optimize_factory(
-            item, target_per_second, era,
-            [MC(prod1, 2)], False,
-        ))
-        # Energy-saving
-        plans.append(optimize_factory(
-            item, target_per_second, era,
-            [MC(eff1, 2)], True,
-        ))
-        # Mixed speed + prod
-        plans.append(optimize_factory(
-            item, target_per_second, era,
-            [MC(speed1, 1), MC(prod1, 1)], False,
-        ))
+        for electric in furnace_modes:
+            # Speed-focused (2× speed modules in assembler 2 = 2 slots)
+            plans.append(optimize_factory(
+                item, target_per_second, era,
+                [MC(speed1, 2)], electric,
+            ))
+            # Productivity-focused
+            plans.append(optimize_factory(
+                item, target_per_second, era,
+                [MC(prod1, 2)], electric,
+            ))
+            # Energy-saving
+            plans.append(optimize_factory(
+                item, target_per_second, era,
+                [MC(eff1, 2)], electric,
+            ))
+            # Mixed speed + prod
+            plans.append(optimize_factory(
+                item, target_per_second, era,
+                [MC(speed1, 1), MC(prod1, 1)], electric,
+            ))
 
     # ── 4. Modular Setup (Using Saved Blueprints) ────────────────────────
     from factorio_optimizer.data.saved_layouts import get_all_layouts
@@ -183,33 +190,35 @@ def compare_plans(
             }
     
     if saved_layouts:
-        mod_chain = build_production_chain(
-            item=item,
-            target_per_second=target_per_second,
-            era=era,
-            modules=user_modules,
-            use_electric_furnace=False,
-            saved_layouts=saved_layouts
-        )
-        uptimes = _collect_uptimes(mod_chain)
-        avg_uptime = sum(uptimes) / len(uptimes) if uptimes else 1.0
-        machines = total_machines(mod_chain.root)
-        energy = total_energy_kw(mod_chain.root)
-        kw_per_out = energy / target_per_second if target_per_second > 0 else 0.0
-        score = _score(avg_uptime, kw_per_out, machines)
-        
-        plans.append(FactoryPlan(
-            name="📦 Modular Setup (Saved Layouts)",
-            era=era,
-            module_configs=user_modules or [],
-            use_electric_furnace=False,
-            chain=mod_chain,
-            score=score,
-            avg_uptime_pct=round(avg_uptime * 100, 1),
-            energy_kw_per_output=round(kw_per_out, 2),
-            total_machines_count=machines,
-            total_energy_kw=round(energy, 1),
-        ))
+        for electric in furnace_modes:
+            mod_chain = build_production_chain(
+                item=item,
+                target_per_second=target_per_second,
+                era=era,
+                modules=user_modules,
+                use_electric_furnace=electric,
+                saved_layouts=saved_layouts
+            )
+            uptimes = _collect_uptimes(mod_chain)
+            avg_uptime = sum(uptimes) / len(uptimes) if uptimes else 1.0
+            machines = total_machines(mod_chain.root)
+            energy = total_energy_kw(mod_chain.root)
+            kw_per_out = energy / target_per_second if target_per_second > 0 else 0.0
+            score = _score(avg_uptime, kw_per_out, machines)
+            furnace_note = " (electric furnace)" if electric else ""
+            
+            plans.append(FactoryPlan(
+                name=f"📦 Modular Setup (Saved Layouts){furnace_note}",
+                era=era,
+                module_configs=user_modules or [],
+                use_electric_furnace=electric,
+                chain=mod_chain,
+                score=score,
+                avg_uptime_pct=round(avg_uptime * 100, 1),
+                energy_kw_per_output=round(kw_per_out, 2),
+                total_machines_count=machines,
+                total_energy_kw=round(energy, 1),
+            ))
 
     # Deduplicate by name, rank by score
     seen: set[str] = set()
@@ -220,6 +229,18 @@ def compare_plans(
             unique.append(p)
 
     return sorted(unique, key=lambda p: p.score, reverse=True)
+
+
+def _furnace_modes_for_request(
+    era: str,
+    use_electric_furnace: bool,
+    compare_furnace_modes: bool,
+) -> list[bool]:
+    if era == "early":
+        return [False]
+    if compare_furnace_modes:
+        return [False, True]
+    return [use_electric_furnace]
 
 
 def factory_plan_to_dict(plan: FactoryPlan) -> dict:
@@ -237,6 +258,7 @@ def factory_plan_to_dict(plan: FactoryPlan) -> dict:
         "total_energy_kw": plan.total_energy_kw,
         "target_per_second": round(plan.chain.target_per_second, 4),
         "target_per_minute": round(plan.chain.target_per_minute, 2),
+        "use_electric_furnace": plan.use_electric_furnace,
         "chain": chain_node_to_dict(plan.chain.root),
         "raw_inputs": {k: round(v, 4) for k, v in raw_inputs.items()},
         "energy_plan": energy_plan_to_dict(energy_plan),
