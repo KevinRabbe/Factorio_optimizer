@@ -4,10 +4,12 @@ import os
 
 from flask import Flask, jsonify, request, send_from_directory
 
+from factorio_optimizer.compiler.request import OptimizationRequest
+from factorio_optimizer.compiler.simple_compiler import compile_optimization_request
+from factorio_optimizer.config.generation_config import GenerationConfig
 from factorio_optimizer.data.items import get_optimizable_items
 from factorio_optimizer.data.modules import MODULES, ModuleConfig, get_module
 from factorio_optimizer.data.saved_layouts import delete_layout, get_all_layouts, save_layout
-from factorio_optimizer.optimizer.factory_optimizer import compare_plans, factory_plan_to_dict
 
 
 app = Flask(
@@ -56,7 +58,9 @@ def api_optimize():
     rate = float(data.get("rate", 1.0))
     unit = data.get("unit", "per_minute")
     era = data.get("era", "mid")
+    power_mode = data.get("power_mode", "external")
     raw_modules = data.get("modules", [])
+    seed = int(data.get("seed", 0))
 
     if unit == "per_minute":
         rate_ps = rate / 60.0
@@ -81,18 +85,24 @@ def api_optimize():
         furnace_mode_note = "Early-game plans use burner furnaces only."
 
     try:
-        plans = compare_plans(
-            item=item,
-            target_per_second=rate_ps,
-            era=era,
-            user_modules=module_configs if module_configs else None,
+        report = compile_optimization_request(
+            OptimizationRequest(
+                target_item=item,
+                target_rate_per_second=rate_ps,
+                era=era,
+                power_mode=power_mode,
+                module_configs=module_configs,
+                config=GenerationConfig(seed=seed, era=era, power_mode=power_mode),
+            )
         )
     except Exception as exc:
         return jsonify({"error": str(exc)}), 400
 
-    top_plans = [factory_plan_to_dict(p) for p in plans[:5]]
+    report_dict = report.to_dict()
+    plans = report_dict["plans"]
 
     return jsonify({
+        # Legacy response fields kept for the current frontend.
         "item": item,
         "rate": rate,
         "unit": unit,
@@ -100,7 +110,13 @@ def api_optimize():
         "era": era,
         "furnace_mode": furnace_mode,
         "furnace_mode_note": furnace_mode_note,
-        "plans": top_plans,
+        "plans": plans[:5],
+
+        # New stable response fields for the refactored UI/backend contract.
+        "report": report_dict,
+        "best_plan": report_dict["best_plan"],
+        "summary": report_dict["summary"],
+        "diagnostics": report_dict["diagnostics"],
     })
 
 
