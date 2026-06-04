@@ -34,6 +34,7 @@ class FactoryObject:
     recipe: str | None = None
     item: str | None = None
     role: str | None = None
+    entity_name: str | None = None
 
     def occupied_tiles(self) -> set[Position]:
         return {
