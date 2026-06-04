@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
-
 from factorio_optimizer.composition.module_composer import CompositionPlan
 from factorio_optimizer.core.blueprint_plan import BlueprintPlan
 from factorio_optimizer.core.flows import Flow
@@ -31,8 +29,6 @@ def expand_composition_to_blueprint_plan(
 
 
 def _flows_from_module_links(module: FactoryModule) -> list[Flow]:
-    links: list[Any] = getattr(module, "flow_links", [])
-
     return [
         Flow(
             flow_id=link.flow_id,
@@ -42,5 +38,5 @@ def _flows_from_module_links(module: FactoryModule) -> list[Flow]:
             method=link.method,
             path=link.path,
         )
-        for link in links
+        for link in module.flow_links
     ]
