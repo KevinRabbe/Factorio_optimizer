@@ -31,6 +31,7 @@ class FurnaceSegment(Segment):
                 height=self.height,
                 recipe=self.recipe,
                 role="producer",
+                entity_name=self.machine_type.replace("_", "-"),
             )
         ]
 
