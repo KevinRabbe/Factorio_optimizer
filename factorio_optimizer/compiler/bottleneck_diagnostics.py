@@ -20,6 +20,7 @@ class ProductionDiagnostic:
     kind: DiagnosticKind
     level: DiagnosticLevel
     reason: str
+    recommendation: str
     exact_machines: float
     built_machines: int
     uptime_pct: float
@@ -37,6 +38,7 @@ class ProductionDiagnostic:
             "kind": self.kind,
             "level": self.level,
             "reason": self.reason,
+            "recommendation": self.recommendation,
             "exact_machines": round(self.exact_machines, 4),
             "built_machines": self.built_machines,
             "uptime_pct": round(self.uptime_pct, 2),
@@ -135,15 +137,19 @@ def _build_node_diagnostic(
         level: DiagnosticLevel = "critical" if is_critical_uptime else "warning"
         reason = _final_reason(is_critical_uptime, is_warning_uptime)
         kind: DiagnosticKind = "final_production_requirement"
+        recommendation = _final_recommendation(built_machines, uptime_pct, rounding_waste)
         severity = (100.0 - uptime_pct) + (rounding_waste * 0.5) + (100.0 if level == "critical" else 25.0)
     else:
-        # Upstream nodes are normally not hard bottlenecks. They tell us what to scale.
-        # Example: more iron gears/copper cable/plates simply means build more upstream modules.
         if not (is_critical_uptime or is_warning_uptime or is_wasteful_rounding):
             return None
         level = "info"
         kind = "intermediate_scaling_requirement"
         reason = "upstream production scaling requirement"
+        recommendation = _upstream_recommendation(
+            display_name=str(node.get("display_name", node.get("item", "this item"))),
+            built_machines=built_machines,
+            target_per_minute=target_per_minute,
+        )
         severity = max(0.0, target_per_minute) + rounding_waste * 0.1
 
     return ProductionDiagnostic(
@@ -153,6 +159,7 @@ def _build_node_diagnostic(
         kind=kind,
         level=level,
         reason=reason,
+        recommendation=recommendation,
         exact_machines=exact_machines,
         built_machines=built_machines,
         uptime_pct=uptime_pct,
@@ -176,3 +183,18 @@ def _final_reason(is_critical: bool, is_warning: bool) -> str:
     if is_warning:
         return "final crafting process has ratio inefficiency"
     return "final crafting process has rounding waste from ceil(machine count)"
+
+
+def _final_recommendation(built_machines: int, uptime_pct: float, rounding_waste: float) -> str:
+    if uptime_pct < 70.0:
+        return f"Build at least {built_machines} final machines, then check belts/inserters feeding the final recipe."
+    if rounding_waste > 30.0:
+        return "This is mostly rounding waste. Increase target rate or accept idle time for a cleaner small factory."
+    return f"Build {built_machines} final machines. This is a ratio warning, not necessarily a broken factory."
+
+
+def _upstream_recommendation(display_name: str, built_machines: int, target_per_minute: float) -> str:
+    return (
+        f"Scale {display_name} production to {target_per_minute:.2f}/min "
+        f"by building {built_machines} upstream machine(s) or module copy/copies."
+    )
