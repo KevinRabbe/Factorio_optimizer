@@ -4,6 +4,8 @@ from factorio_optimizer.compiler.bottleneck_diagnostics import (
     build_bottleneck_diagnostics,
     build_bottleneck_summary,
 )
+from factorio_optimizer.compiler.build_list import build_factory_build_list
+from factorio_optimizer.compiler.dependency_edges import build_dependency_edges
 from factorio_optimizer.compiler.power_diagnostics import (
     build_power_diagnostics,
     build_power_summary,
@@ -40,16 +42,24 @@ def compile_optimization_request(request: OptimizationRequest) -> OptimizationRe
     transport_summary = build_transport_summary(transport)
     power = build_power_diagnostics(best_plan)
     power_summary = build_power_summary(power)
+    dependency_edges = build_dependency_edges(best_plan)
+    build_list = build_factory_build_list(
+        best_plan,
+        request.era,
+        belt_name=request.belt_name,
+        inserter_name=request.inserter_name,
+    )
     summary = _build_summary(
         best_plan=best_plan,
         plan_count=len(plan_dicts),
         bottleneck_summary=bottleneck_summary,
         transport_summary=transport_summary,
         power_summary=power_summary,
+        build_list=build_list,
     )
     diagnostics = {
         "compiler": "simple_compiler",
-        "report_schema_version": 6,
+        "report_schema_version": 7,
         "deterministic_seed": request.config.seed,
         "use_electric_furnace": request.use_electric_furnace,
         "compare_furnace_modes": request.compare_furnace_modes,
@@ -61,6 +71,8 @@ def compile_optimization_request(request: OptimizationRequest) -> OptimizationRe
         "transport_summary": transport_summary,
         "power": power,
         "power_summary": power_summary,
+        "dependency_edges": dependency_edges,
+        "build_list": build_list,
     }
 
     return OptimizationReport(
@@ -83,6 +95,7 @@ def _build_summary(
     bottleneck_summary: dict | None = None,
     transport_summary: dict | None = None,
     power_summary: dict | None = None,
+    build_list: dict | None = None,
 ) -> dict:
     if not best_plan:
         return {
@@ -94,6 +107,7 @@ def _build_summary(
             "bottleneck_summary": bottleneck_summary or {},
             "transport_summary": transport_summary or {},
             "power_summary": power_summary or {},
+            "build_list": build_list or {},
         }
 
     return {
@@ -107,4 +121,5 @@ def _build_summary(
         "bottleneck_summary": bottleneck_summary or {},
         "transport_summary": transport_summary or {},
         "power_summary": power_summary or {},
+        "build_list": build_list or {},
     }
