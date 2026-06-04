@@ -16,6 +16,7 @@ ENTITY_NAMES = {
     "belt": "transport-belt",
     "inserter": "inserter",
     "assembler": "assembling-machine-1",
+    "furnace": "stone-furnace",
     "splitter": "splitter",
 }
 
@@ -46,7 +47,7 @@ def export_plan_to_blueprint_json(plan: BlueprintPlan) -> dict[str, Any]:
             "direction": FACTORIO_DIRECTIONS[obj.direction],
         }
 
-        if obj.object_type == "assembler" and obj.recipe is not None:
+        if obj.object_type in {"assembler", "furnace"} and obj.recipe is not None:
             entity["recipe"] = obj.recipe
 
         entities.append(entity)
