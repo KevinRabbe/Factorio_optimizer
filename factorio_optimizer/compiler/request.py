@@ -13,6 +13,8 @@ class OptimizationRequest:
     era: Era = "mid"
     power_mode: PowerMode = "external"
     module_configs: list[ModuleConfig] = field(default_factory=list)
+    use_electric_furnace: bool = False
+    compare_furnace_modes: bool = False
     config: GenerationConfig = field(default_factory=GenerationConfig)
 
     @property
