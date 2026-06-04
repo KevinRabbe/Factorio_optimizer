@@ -130,19 +130,21 @@ function renderBottleneckDiagnostics(best) {
   if (!chainTree || !best?.chain) return;
 
   const candidates = collectBottleneckCandidates(best.chain);
-  const worst = candidates.slice(0, 5);
+  const critical = candidates.filter(candidate => candidate.level === 'critical');
+  const warnings = candidates.filter(candidate => candidate.level === 'warning');
+  const shown = candidates.slice(0, 6);
 
   const diagnostics = document.createElement('div');
   diagnostics.className = 'chain-node';
   diagnostics.style.marginBottom = '10px';
 
-  if (!worst.length) {
+  if (!shown.length) {
     diagnostics.innerHTML = `
       <div class="chain-node-header">
         <span class="cn-icon">✅</span>
         <div class="cn-info">
           <div class="cn-name">Bottleneck Check</div>
-          <div class="cn-machine">No obvious uptime bottlenecks found in the current production chain.</div>
+          <div class="cn-machine">No obvious uptime bottlenecks or ratio inefficiencies found.</div>
         </div>
         <div class="cn-stats">
           <span class="cn-count">stable</span>
@@ -153,9 +155,9 @@ function renderBottleneckDiagnostics(best) {
     return;
   }
 
-  const rows = worst.map(candidate => `
+  const rows = shown.map(candidate => `
     <div class="cn-energy">
-      ${candidate.icon} <strong>${candidate.displayName}</strong>
+      ${candidate.badge} ${candidate.icon} <strong>${candidate.displayName}</strong>
       &nbsp;·&nbsp; ${candidate.reason}
       &nbsp;·&nbsp; exact ${candidate.exact.toFixed(2)} → built ×${candidate.built}
       &nbsp;·&nbsp; uptime ${candidate.uptime.toFixed(1)}%
@@ -164,13 +166,15 @@ function renderBottleneckDiagnostics(best) {
 
   diagnostics.innerHTML = `
     <div class="chain-node-header">
-      <span class="cn-icon">🚧</span>
+      <span class="cn-icon">${critical.length ? '🚧' : '⚠️'}</span>
       <div class="cn-info">
-        <div class="cn-name">Bottleneck Candidates</div>
-        <div class="cn-machine">Lowest machine uptime / highest rounding waste first.</div>
+        <div class="cn-name">Bottleneck / Ratio Check</div>
+        <div class="cn-machine">
+          ${critical.length} critical · ${warnings.length} warning · critical below 70%, warning below 90% uptime.
+        </div>
       </div>
       <div class="cn-stats">
-        <span class="cn-count">${worst.length} shown</span>
+        <span class="cn-count">${shown.length} shown</span>
         <span class="cn-rate">check</span>
       </div>
     </div>
@@ -202,10 +206,18 @@ function collectBottleneckCandidates(root) {
     const exact = Number(node.machine_count_exact || 0);
     const built = Number(node.machine_count_ceil || 0);
     const roundingWaste = built > 0 ? Math.max(0, built - exact) / built : 0;
-    const isLowUptime = uptime > 0 && uptime < 70;
+    const isCriticalUptime = uptime > 0 && uptime < 70;
+    const isWarningUptime = uptime >= 70 && uptime < 90;
     const isWastefulRounding = roundingWaste > 0.30;
 
-    if (isLowUptime || isWastefulRounding) {
+    if (isCriticalUptime || isWarningUptime || isWastefulRounding) {
+      const level = isCriticalUptime ? 'critical' : 'warning';
+      const reason = isCriticalUptime
+        ? 'critical low machine uptime'
+        : isWarningUptime
+          ? 'ratio inefficiency warning'
+          : 'rounding waste from ceil(machine count)';
+
       candidates.push({
         item: node.item,
         displayName: node.display_name || node.item,
@@ -214,10 +226,10 @@ function collectBottleneckCandidates(root) {
         built,
         uptime,
         roundingWaste,
-        reason: isLowUptime
-          ? 'low machine uptime'
-          : 'rounding waste from ceil(machine count)',
-        severity: (100 - uptime) + (roundingWaste * 50),
+        level,
+        badge: level === 'critical' ? '🚨' : '⚠️',
+        reason,
+        severity: (100 - uptime) + (roundingWaste * 50) + (level === 'critical' ? 100 : 0),
       });
     }
 
