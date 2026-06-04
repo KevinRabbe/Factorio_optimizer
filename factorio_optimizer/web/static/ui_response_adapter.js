@@ -486,8 +486,10 @@ function escapeHtml(value) {
 })();
 
 (function loadProductionDiagnosticsAdapter() {
-  if (document.querySelector('script[src="/ui_diagnostics_adapter.js"]')) return;
-  const script = document.createElement('script');
-  script.src = '/ui_diagnostics_adapter.js';
-  document.body.appendChild(script);
+  for (const src of ['/ui_diagnostics_adapter.js', '/ui_power_diagnostics_adapter.js']) {
+    if (document.querySelector(`script[src="${src}"]`)) continue;
+    const script = document.createElement('script');
+    script.src = src;
+    document.body.appendChild(script);
+  }
 })();
