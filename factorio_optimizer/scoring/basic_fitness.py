@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from factorio_optimizer.core.blueprint_plan import BlueprintPlan
-from factorio_optimizer.validation.static_validator import validate_plan
+from factorio_optimizer.validation.structure_validator import validate_plan_structure
 
 
 @dataclass
@@ -26,7 +26,7 @@ class FitnessBreakdown:
 
 
 def score_plan(plan: BlueprintPlan) -> FitnessBreakdown:
-    validation = validate_plan(plan)
+    validation = validate_plan_structure(plan)
 
     valid_bonus = 10_000 if validation.passed else 0
     entity_penalty = len(plan.objects) * 10
