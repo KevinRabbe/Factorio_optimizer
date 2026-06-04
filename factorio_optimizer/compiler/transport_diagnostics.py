@@ -67,23 +67,29 @@ class TransportDiagnostic:
         }
 
 
-def build_transport_diagnostics(best_plan: dict, era: str, limit: int = 12) -> list[dict]:
+def build_transport_diagnostics(
+    best_plan: dict,
+    era: str,
+    belt_name: str | None = None,
+    inserter_name: str | None = None,
+    limit: int = 12,
+) -> list[dict]:
     chain = best_plan.get("chain") if best_plan else None
     if not chain:
         return []
 
-    belt_name = ERA_BELT.get(era, "transport_belt")
-    inserter_name = ERA_INSERTER.get(era, "inserter")
-    belt_capacity = BELT_CAPACITY_ITEMS_PER_SECOND[belt_name]
-    inserter_capacity = INSERTER_CAPACITY_ITEMS_PER_SECOND[inserter_name]
+    selected_belt = _resolve_belt_name(era, belt_name)
+    selected_inserter = _resolve_inserter_name(era, inserter_name)
+    belt_capacity = BELT_CAPACITY_ITEMS_PER_SECOND[selected_belt]
+    inserter_capacity = INSERTER_CAPACITY_ITEMS_PER_SECOND[selected_inserter]
 
     diagnostics: list[TransportDiagnostic] = []
     _collect_transport_diagnostics(
         node=chain,
         diagnostics=diagnostics,
-        belt_name=belt_name,
+        belt_name=selected_belt,
         belt_capacity=belt_capacity,
-        inserter_name=inserter_name,
+        inserter_name=selected_inserter,
         inserter_capacity=inserter_capacity,
     )
     diagnostics.sort(key=lambda item: item.utilization_pct, reverse=True)
@@ -100,6 +106,18 @@ def build_transport_summary(diagnostics: list[dict]) -> dict:
         "warning_count": warning_count,
         "total_count": len(diagnostics),
     }
+
+
+def _resolve_belt_name(era: str, belt_name: str | None) -> str:
+    if belt_name in BELT_CAPACITY_ITEMS_PER_SECOND:
+        return belt_name
+    return ERA_BELT.get(era, "transport_belt")
+
+
+def _resolve_inserter_name(era: str, inserter_name: str | None) -> str:
+    if inserter_name in INSERTER_CAPACITY_ITEMS_PER_SECOND:
+        return inserter_name
+    return ERA_INSERTER.get(era, "inserter")
 
 
 def _collect_transport_diagnostics(
