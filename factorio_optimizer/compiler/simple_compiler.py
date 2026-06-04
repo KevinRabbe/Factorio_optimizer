@@ -15,6 +15,8 @@ def compile_optimization_request(request: OptimizationRequest) -> OptimizationRe
         target_per_second=request.target_rate_per_second,
         era=request.era,
         user_modules=request.module_configs if request.module_configs else None,
+        use_electric_furnace=request.use_electric_furnace,
+        compare_furnace_modes=request.compare_furnace_modes,
     )
     plan_dicts = [factory_plan_to_dict(plan) for plan in plans]
     best_plan = plan_dicts[0] if plan_dicts else {}
@@ -28,8 +30,10 @@ def compile_optimization_request(request: OptimizationRequest) -> OptimizationRe
     )
     diagnostics = {
         "compiler": "simple_compiler",
-        "report_schema_version": 2,
+        "report_schema_version": 3,
         "deterministic_seed": request.config.seed,
+        "use_electric_furnace": request.use_electric_furnace,
+        "compare_furnace_modes": request.compare_furnace_modes,
         "bottlenecks": bottlenecks,
         "bottleneck_summary": bottleneck_summary,
     }
