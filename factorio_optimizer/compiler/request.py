@@ -15,6 +15,8 @@ class OptimizationRequest:
     module_configs: list[ModuleConfig] = field(default_factory=list)
     use_electric_furnace: bool = False
     compare_furnace_modes: bool = False
+    belt_name: str | None = None
+    inserter_name: str | None = None
     config: GenerationConfig = field(default_factory=GenerationConfig)
 
     @property
