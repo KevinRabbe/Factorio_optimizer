@@ -205,17 +205,18 @@ def _final_recommendation(
     uptime_pct: float,
     rounding_waste: float,
 ) -> str:
+    machine_label = _pluralize(machine_display_name, built_machines)
     if uptime_pct < 70.0:
         return (
-            f"Build at least {built_machines} {machine_display_name}(s) for the final recipe, "
+            f"Build at least {built_machines} {machine_label} for the final recipe, "
             "then check belts/inserters feeding the final process."
         )
     if rounding_waste > 30.0:
         return (
-            f"Use {built_machines} {machine_display_name}(s), or increase the target rate "
+            f"Use {built_machines} {machine_label}, or increase the target rate "
             "to reduce idle time from machine rounding."
         )
-    return f"Build {built_machines} {machine_display_name}(s). This is a ratio warning, not a broken factory."
+    return f"Build {built_machines} {machine_label}. This is a ratio warning, not a broken factory."
 
 
 def _upstream_recommendation(
@@ -224,7 +225,17 @@ def _upstream_recommendation(
     built_machines: int,
     target_per_minute: float,
 ) -> str:
+    machine_label = _pluralize(machine_display_name, built_machines)
+    module_label = "module copy" if built_machines == 1 else "module copies"
     return (
         f"Scale {display_name} to {target_per_minute:.2f}/min by building "
-        f"{built_machines} {machine_display_name}(s) or module copy/copies."
+        f"{built_machines} {machine_label} or {built_machines} {module_label}."
     )
+
+
+def _pluralize(label: str, count: int) -> str:
+    if count == 1:
+        return label
+    if label.endswith("s"):
+        return label
+    return f"{label}s"
