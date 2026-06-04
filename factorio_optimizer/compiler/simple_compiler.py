@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from factorio_optimizer.compiler.bottleneck_diagnostics import (
+    build_bottleneck_diagnostics,
+    build_bottleneck_summary,
+)
 from factorio_optimizer.compiler.request import OptimizationRequest
 from factorio_optimizer.compiler.result import OptimizationReport
 from factorio_optimizer.optimizer.factory_optimizer import compare_plans, factory_plan_to_dict
@@ -15,11 +19,19 @@ def compile_optimization_request(request: OptimizationRequest) -> OptimizationRe
     plan_dicts = [factory_plan_to_dict(plan) for plan in plans]
     best_plan = plan_dicts[0] if plan_dicts else {}
 
-    summary = _build_summary(best_plan=best_plan, plan_count=len(plan_dicts))
+    bottlenecks = build_bottleneck_diagnostics(best_plan)
+    bottleneck_summary = build_bottleneck_summary(bottlenecks)
+    summary = _build_summary(
+        best_plan=best_plan,
+        plan_count=len(plan_dicts),
+        bottleneck_summary=bottleneck_summary,
+    )
     diagnostics = {
         "compiler": "simple_compiler",
-        "report_schema_version": 1,
+        "report_schema_version": 2,
         "deterministic_seed": request.config.seed,
+        "bottlenecks": bottlenecks,
+        "bottleneck_summary": bottleneck_summary,
     }
 
     return OptimizationReport(
@@ -36,7 +48,7 @@ def compile_optimization_request(request: OptimizationRequest) -> OptimizationRe
     )
 
 
-def _build_summary(best_plan: dict, plan_count: int) -> dict:
+def _build_summary(best_plan: dict, plan_count: int, bottleneck_summary: dict | None = None) -> dict:
     if not best_plan:
         return {
             "plan_count": plan_count,
@@ -44,6 +56,7 @@ def _build_summary(best_plan: dict, plan_count: int) -> dict:
             "total_machines": 0,
             "total_energy_kw": 0.0,
             "efficiency_score": 0.0,
+            "bottleneck_summary": bottleneck_summary or {},
         }
 
     return {
@@ -54,4 +67,5 @@ def _build_summary(best_plan: dict, plan_count: int) -> dict:
         "efficiency_score": best_plan.get("score", 0.0),
         "raw_inputs": best_plan.get("raw_inputs", {}),
         "energy_plan": best_plan.get("energy_plan", {}),
+        "bottleneck_summary": bottleneck_summary or {},
     }
