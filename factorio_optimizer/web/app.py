@@ -67,6 +67,8 @@ def api_optimize():
     seed = int(data.get("seed", 0))
     use_electric_furnace = bool(data.get("use_electric_furnace", False))
     compare_furnace_modes = bool(data.get("compare_furnace_modes", False))
+    belt_name = data.get("belt_name") or None
+    inserter_name = data.get("inserter_name") or None
 
     if unit == "per_minute":
         rate_ps = rate / 60.0
@@ -105,6 +107,8 @@ def api_optimize():
                 module_configs=module_configs,
                 use_electric_furnace=use_electric_furnace,
                 compare_furnace_modes=compare_furnace_modes,
+                belt_name=belt_name,
+                inserter_name=inserter_name,
                 config=GenerationConfig(seed=seed, era=era, power_mode=power_mode),
             )
         )
@@ -123,6 +127,8 @@ def api_optimize():
         "era": era,
         "use_electric_furnace": use_electric_furnace,
         "compare_furnace_modes": compare_furnace_modes,
+        "belt_name": belt_name,
+        "inserter_name": inserter_name,
         "furnace_mode": furnace_mode,
         "furnace_mode_note": furnace_mode_note,
         "plans": plans[:5],
