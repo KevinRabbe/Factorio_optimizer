@@ -6,6 +6,10 @@ from factorio_optimizer.compiler.bottleneck_diagnostics import (
 )
 from factorio_optimizer.compiler.request import OptimizationRequest
 from factorio_optimizer.compiler.result import OptimizationReport
+from factorio_optimizer.compiler.transport_diagnostics import (
+    build_transport_diagnostics,
+    build_transport_summary,
+)
 from factorio_optimizer.optimizer.factory_optimizer import compare_plans, factory_plan_to_dict
 
 
@@ -23,19 +27,24 @@ def compile_optimization_request(request: OptimizationRequest) -> OptimizationRe
 
     bottlenecks = build_bottleneck_diagnostics(best_plan)
     bottleneck_summary = build_bottleneck_summary(bottlenecks)
+    transport = build_transport_diagnostics(best_plan, request.era)
+    transport_summary = build_transport_summary(transport)
     summary = _build_summary(
         best_plan=best_plan,
         plan_count=len(plan_dicts),
         bottleneck_summary=bottleneck_summary,
+        transport_summary=transport_summary,
     )
     diagnostics = {
         "compiler": "simple_compiler",
-        "report_schema_version": 3,
+        "report_schema_version": 4,
         "deterministic_seed": request.config.seed,
         "use_electric_furnace": request.use_electric_furnace,
         "compare_furnace_modes": request.compare_furnace_modes,
         "bottlenecks": bottlenecks,
         "bottleneck_summary": bottleneck_summary,
+        "transport": transport,
+        "transport_summary": transport_summary,
     }
 
     return OptimizationReport(
@@ -52,7 +61,12 @@ def compile_optimization_request(request: OptimizationRequest) -> OptimizationRe
     )
 
 
-def _build_summary(best_plan: dict, plan_count: int, bottleneck_summary: dict | None = None) -> dict:
+def _build_summary(
+    best_plan: dict,
+    plan_count: int,
+    bottleneck_summary: dict | None = None,
+    transport_summary: dict | None = None,
+) -> dict:
     if not best_plan:
         return {
             "plan_count": plan_count,
@@ -61,6 +75,7 @@ def _build_summary(best_plan: dict, plan_count: int, bottleneck_summary: dict | 
             "total_energy_kw": 0.0,
             "efficiency_score": 0.0,
             "bottleneck_summary": bottleneck_summary or {},
+            "transport_summary": transport_summary or {},
         }
 
     return {
@@ -72,4 +87,5 @@ def _build_summary(best_plan: dict, plan_count: int, bottleneck_summary: dict | 
         "raw_inputs": best_plan.get("raw_inputs", {}),
         "energy_plan": best_plan.get("energy_plan", {}),
         "bottleneck_summary": bottleneck_summary or {},
+        "transport_summary": transport_summary or {},
     }
