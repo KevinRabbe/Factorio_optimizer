@@ -45,6 +45,7 @@ function renderResults(data) {
 
   renderSummaryCards(best, normalized.raw);
   renderTargetDiagnostics(best, normalized);
+  renderBottleneckDiagnostics(best);
 
   if (best.chain) {
     renderChainTree(best.chain);
@@ -124,6 +125,60 @@ function renderTargetDiagnostics(best, normalized) {
   chainTree.appendChild(diagnostics);
 }
 
+function renderBottleneckDiagnostics(best) {
+  const chainTree = document.getElementById('chain-tree');
+  if (!chainTree || !best?.chain) return;
+
+  const candidates = collectBottleneckCandidates(best.chain);
+  const worst = candidates.slice(0, 5);
+
+  const diagnostics = document.createElement('div');
+  diagnostics.className = 'chain-node';
+  diagnostics.style.marginBottom = '10px';
+
+  if (!worst.length) {
+    diagnostics.innerHTML = `
+      <div class="chain-node-header">
+        <span class="cn-icon">✅</span>
+        <div class="cn-info">
+          <div class="cn-name">Bottleneck Check</div>
+          <div class="cn-machine">No obvious uptime bottlenecks found in the current production chain.</div>
+        </div>
+        <div class="cn-stats">
+          <span class="cn-count">stable</span>
+          <span class="cn-rate">ok</span>
+        </div>
+      </div>`;
+    chainTree.appendChild(diagnostics);
+    return;
+  }
+
+  const rows = worst.map(candidate => `
+    <div class="cn-energy">
+      ${candidate.icon} <strong>${candidate.displayName}</strong>
+      &nbsp;·&nbsp; ${candidate.reason}
+      &nbsp;·&nbsp; exact ${candidate.exact.toFixed(2)} → built ×${candidate.built}
+      &nbsp;·&nbsp; uptime ${candidate.uptime.toFixed(1)}%
+    </div>
+  `).join('');
+
+  diagnostics.innerHTML = `
+    <div class="chain-node-header">
+      <span class="cn-icon">🚧</span>
+      <div class="cn-info">
+        <div class="cn-name">Bottleneck Candidates</div>
+        <div class="cn-machine">Lowest machine uptime / highest rounding waste first.</div>
+      </div>
+      <div class="cn-stats">
+        <span class="cn-count">${worst.length} shown</span>
+        <span class="cn-rate">check</span>
+      </div>
+    </div>
+    ${rows}`;
+
+  chainTree.appendChild(diagnostics);
+}
+
 function renderChainTree(node, depth = 0) {
   const container = document.getElementById('chain-tree');
   if (depth === 0 && !container.querySelector('.chain-node')) {
@@ -135,6 +190,42 @@ function renderChainTree(node, depth = 0) {
     container.appendChild(nodeEl);
   }
   return nodeEl;
+}
+
+function collectBottleneckCandidates(root) {
+  const candidates = [];
+
+  function walk(node) {
+    if (!node || node.is_raw) return;
+
+    const uptime = Number(node.uptime_pct || 0);
+    const exact = Number(node.machine_count_exact || 0);
+    const built = Number(node.machine_count_ceil || 0);
+    const roundingWaste = built > 0 ? Math.max(0, built - exact) / built : 0;
+    const isLowUptime = uptime > 0 && uptime < 70;
+    const isWastefulRounding = roundingWaste > 0.30;
+
+    if (isLowUptime || isWastefulRounding) {
+      candidates.push({
+        item: node.item,
+        displayName: node.display_name || node.item,
+        icon: node.icon || '⚙️',
+        exact,
+        built,
+        uptime,
+        roundingWaste,
+        reason: isLowUptime
+          ? 'low machine uptime'
+          : 'rounding waste from ceil(machine count)',
+        severity: (100 - uptime) + (roundingWaste * 50),
+      });
+    }
+
+    for (const child of (node.children || [])) walk(child);
+  }
+
+  walk(root);
+  return candidates.sort((a, b) => b.severity - a.severity);
 }
 
 function getExactMachineCount(plan) {
