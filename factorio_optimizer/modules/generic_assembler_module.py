@@ -4,7 +4,7 @@ from factorio_optimizer.core.objects import Position
 from factorio_optimizer.data.machines import get_machine
 from factorio_optimizer.data.recipes import get_recipe
 from factorio_optimizer.modules.connections import ModuleConnection
-from factorio_optimizer.modules.module_base import FactoryModule, ModuleRate
+from factorio_optimizer.modules.module_base import FactoryModule, Footprint, ModuleRate
 from factorio_optimizer.segments.assembler_segment import create_assembler_segment
 from factorio_optimizer.segments.belt_segment import create_belt_segment
 from factorio_optimizer.segments.inserter_segment import create_inserter_transfer_segment
@@ -113,20 +113,7 @@ def build_generic_assembler_module(
         ModuleRate(item=item, amount_per_second=amount * crafts_per_second)
         for item, amount in recipe.outputs.items()
     ]
-
-    module = FactoryModule(
-        module_id=module_id,
-        module_type="generic_assembler_module",
-        position=origin,
-        input_ports=input_ports,
-        output_ports=output_ports,
-        input_rates=input_rates,
-        output_rates=output_rates,
-        segments=segments,
-    )
-    module.recipe_name = recipe_name
-    module.machine_name = machine_name
-    module.flow_links = _build_flow_links(
+    flow_links = _build_flow_links(
         module_id=module_id,
         recipe_name=recipe_name,
         input_items=input_items,
@@ -137,7 +124,21 @@ def build_generic_assembler_module(
         output_lane_y=output_lane_y,
         input_lane_y_by_item=input_lane_y_by_item,
     )
-    return module
+
+    return FactoryModule(
+        module_id=module_id,
+        module_type="generic_assembler_module",
+        position=origin,
+        input_ports=input_ports,
+        output_ports=output_ports,
+        input_rates=input_rates,
+        output_rates=output_rates,
+        segments=segments,
+        flow_links=flow_links,
+        recipe_name=recipe_name,
+        machine_name=machine_name,
+        footprint=Footprint(width=9, height=output_lane_y - origin.y + 2),
+    )
 
 
 def _build_flow_links(
