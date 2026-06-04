@@ -26,6 +26,9 @@ def _symbol_for_object(object_type: str, role: str | None) -> str:
     if object_type == "assembler":
         return "A"
 
+    if object_type == "furnace":
+        return "F"
+
     if object_type == "inserter":
         if role == "ingredient_transfer":
             return "i"
