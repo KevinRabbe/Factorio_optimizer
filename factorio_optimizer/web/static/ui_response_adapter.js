@@ -279,3 +279,176 @@ function formatTargetRate(perMinute) {
   if (perMinute >= 10) return `${perMinute.toFixed(0)}/min`;
   return `${perMinute.toFixed(2)}/min`;
 }
+
+function injectBlueprintButton() {
+  const optimizeBtn = document.getElementById('optimize-btn');
+  if (!optimizeBtn || document.getElementById('generate-blueprint-btn')) return;
+
+  const btn = document.createElement('button');
+  btn.className = 'optimize-btn';
+  btn.id = 'generate-blueprint-btn';
+  btn.disabled = !state.selectedItem;
+  btn.style.marginTop = '10px';
+  btn.style.background = 'linear-gradient(135deg, var(--blue), var(--purple))';
+  btn.onclick = runGenerateModuleBlueprint;
+  btn.innerHTML = '<span class="optimize-icon">📐</span><span id="generate-blueprint-btn-text">Generate Blueprint</span>';
+
+  optimizeBtn.insertAdjacentElement('afterend', btn);
+}
+
+function updateBlueprintButtonState() {
+  const btn = document.getElementById('generate-blueprint-btn');
+  const text = document.getElementById('generate-blueprint-btn-text');
+  if (!btn || !text) return;
+
+  btn.disabled = !state.selectedItem;
+  text.textContent = state.selectedItem
+    ? `Generate Blueprint — ${state.selectedItem.display_name}`
+    : 'Generate Blueprint';
+}
+
+async function runGenerateModuleBlueprint() {
+  if (!state.selectedItem) return;
+
+  const btn = document.getElementById('generate-blueprint-btn');
+  const text = document.getElementById('generate-blueprint-btn-text');
+  const oldText = text ? text.textContent : '';
+
+  if (btn) btn.disabled = true;
+  if (text) text.textContent = 'Generating blueprint…';
+  setResultsState('loading');
+
+  try {
+    const res = await fetch('/api/generate-module-blueprint', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        recipe_name: state.selectedItem.name,
+        era: state.machineEra,
+        seed: 0,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'Blueprint generation failed.');
+
+    state.lastBlueprintReport = data;
+    renderModuleBlueprintReport(data);
+  } catch (err) {
+    setResultsState('placeholder');
+    alert(`Blueprint generation failed: ${err.message}`);
+  } finally {
+    if (btn) btn.disabled = !state.selectedItem;
+    if (text) text.textContent = oldText || `Generate Blueprint — ${state.selectedItem?.display_name || ''}`;
+  }
+}
+
+function renderModuleBlueprintReport(report) {
+  setResultsState('results');
+  state.activeResultTab = 'best';
+  updateResultTabButtons();
+
+  document.getElementById('summary-cards').innerHTML = `
+    <div class="summary-card ${report.structure_valid ? 'card-green' : 'card-purple'}">
+      <div class="sc-icon">🏗️</div>
+      <div class="sc-value">${report.structure_valid ? 'PASS' : 'FAIL'}</div>
+      <div class="sc-label">Structure</div>
+    </div>
+    <div class="summary-card ${report.recipe_valid ? 'card-green' : 'card-purple'}">
+      <div class="sc-icon">🧪</div>
+      <div class="sc-value">${report.recipe_valid ? 'PASS' : 'FAIL'}</div>
+      <div class="sc-label">Recipe</div>
+    </div>
+    <div class="summary-card ${report.connection_valid ? 'card-green' : 'card-purple'}">
+      <div class="sc-icon">🔌</div>
+      <div class="sc-value">${report.connection_valid ? 'PASS' : 'FAIL'}</div>
+      <div class="sc-label">Connections</div>
+    </div>
+    <div class="summary-card card-blue">
+      <div class="sc-icon">📐</div>
+      <div class="sc-value">${report.width}×${report.height}</div>
+      <div class="sc-label">Module Size</div>
+    </div>`;
+
+  const errors = report.validation_errors && report.validation_errors.length
+    ? report.validation_errors.map(error => `<div class="cn-energy">❌ ${escapeHtml(error)}</div>`).join('')
+    : '<div class="cn-energy">✅ No validation errors.</div>';
+
+  document.getElementById('chain-tree').innerHTML = `
+    <div class="chain-node">
+      <div class="chain-node-header">
+        <span class="cn-icon">📐</span>
+        <div class="cn-info">
+          <div class="cn-name">Generated Module Blueprint: ${escapeHtml(report.recipe_name)}</div>
+          <div class="cn-machine">${escapeHtml(report.module_type)} · ${escapeHtml(report.machine_name || 'auto machine')}</div>
+        </div>
+        <div class="cn-stats">
+          <span class="cn-count">${report.valid ? 'valid' : 'invalid'}</span>
+          <span class="cn-rate">blueprint</span>
+        </div>
+      </div>
+      ${errors}
+    </div>
+    <div class="chain-node">
+      <div class="chain-node-header">
+        <span class="cn-icon">🧱</span>
+        <div class="cn-info">
+          <div class="cn-name">ASCII Layout</div>
+          <div class="cn-machine">Generated from FactoryModule → BlueprintPlan</div>
+        </div>
+      </div>
+      <pre style="white-space:pre; overflow:auto; padding:12px; color:var(--text); background:rgba(0,0,0,0.22); border-radius:10px;">${escapeHtml(report.ascii || '')}</pre>
+    </div>
+    <div class="chain-node">
+      <div class="chain-node-header">
+        <span class="cn-icon">📋</span>
+        <div class="cn-info">
+          <div class="cn-name">Blueprint String</div>
+          <div class="cn-machine">Copy and import in Factorio.</div>
+        </div>
+        <div class="cn-stats">
+          <button class="save-layout-btn" onclick="copyGeneratedBlueprintString()">Copy</button>
+        </div>
+      </div>
+      <pre id="generated-blueprint-string" style="white-space:pre-wrap; word-break:break-all; overflow:auto; max-height:160px; padding:12px; color:var(--text); background:rgba(0,0,0,0.22); border-radius:10px;">${escapeHtml(report.blueprint_string || '')}</pre>
+    </div>`;
+
+  document.getElementById('compare-table').innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-dim)">Blueprint generation does not compare production plans yet.</div>';
+  document.getElementById('energy-view').innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-dim)">Energy view is available for full optimization plans.</div>';
+  document.getElementById('raw-inputs-view').innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-dim)">Raw input view is available for full optimization plans.</div>';
+
+  showResultTab('best');
+}
+
+async function copyGeneratedBlueprintString() {
+  const value = state.lastBlueprintReport?.blueprint_string || '';
+  if (!value) return;
+
+  try {
+    await navigator.clipboard.writeText(value);
+    showToast();
+  } catch (_err) {
+    prompt('Copy blueprint string:', value);
+  }
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+(function installBlueprintUiAdapter() {
+  injectBlueprintButton();
+  updateBlueprintButtonState();
+
+  const originalSelectItem = window.selectItem;
+  if (typeof originalSelectItem === 'function') {
+    window.selectItem = function patchedSelectItem(item) {
+      originalSelectItem(item);
+      updateBlueprintButtonState();
+    };
+  }
+})();
