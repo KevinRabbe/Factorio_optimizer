@@ -4,6 +4,10 @@ from factorio_optimizer.compiler.bottleneck_diagnostics import (
     build_bottleneck_diagnostics,
     build_bottleneck_summary,
 )
+from factorio_optimizer.compiler.power_diagnostics import (
+    build_power_diagnostics,
+    build_power_summary,
+)
 from factorio_optimizer.compiler.request import OptimizationRequest
 from factorio_optimizer.compiler.result import OptimizationReport
 from factorio_optimizer.compiler.transport_diagnostics import (
@@ -34,15 +38,18 @@ def compile_optimization_request(request: OptimizationRequest) -> OptimizationRe
         inserter_name=request.inserter_name,
     )
     transport_summary = build_transport_summary(transport)
+    power = build_power_diagnostics(best_plan)
+    power_summary = build_power_summary(power)
     summary = _build_summary(
         best_plan=best_plan,
         plan_count=len(plan_dicts),
         bottleneck_summary=bottleneck_summary,
         transport_summary=transport_summary,
+        power_summary=power_summary,
     )
     diagnostics = {
         "compiler": "simple_compiler",
-        "report_schema_version": 5,
+        "report_schema_version": 6,
         "deterministic_seed": request.config.seed,
         "use_electric_furnace": request.use_electric_furnace,
         "compare_furnace_modes": request.compare_furnace_modes,
@@ -52,6 +59,8 @@ def compile_optimization_request(request: OptimizationRequest) -> OptimizationRe
         "bottleneck_summary": bottleneck_summary,
         "transport": transport,
         "transport_summary": transport_summary,
+        "power": power,
+        "power_summary": power_summary,
     }
 
     return OptimizationReport(
@@ -73,6 +82,7 @@ def _build_summary(
     plan_count: int,
     bottleneck_summary: dict | None = None,
     transport_summary: dict | None = None,
+    power_summary: dict | None = None,
 ) -> dict:
     if not best_plan:
         return {
@@ -83,6 +93,7 @@ def _build_summary(
             "efficiency_score": 0.0,
             "bottleneck_summary": bottleneck_summary or {},
             "transport_summary": transport_summary or {},
+            "power_summary": power_summary or {},
         }
 
     return {
@@ -95,4 +106,5 @@ def _build_summary(
         "energy_plan": best_plan.get("energy_plan", {}),
         "bottleneck_summary": bottleneck_summary or {},
         "transport_summary": transport_summary or {},
+        "power_summary": power_summary or {},
     }
