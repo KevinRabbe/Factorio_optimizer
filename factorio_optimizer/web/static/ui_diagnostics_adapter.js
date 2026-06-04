@@ -60,6 +60,7 @@ function renderBottleneckDiagnostics(best, normalized) {
       &nbsp;·&nbsp; target ${candidate.targetPerMinute.toFixed(2)}/min
       &nbsp;·&nbsp; exact ${candidate.exact.toFixed(2)} → build ×${candidate.built}
       &nbsp;·&nbsp; uptime ${candidate.uptime.toFixed(1)}%
+      <br><span style="opacity:0.85">➡️ ${escapeHtml(candidate.recommendation)}</span>
     </div>
   `).join('');
 
@@ -104,6 +105,7 @@ function fromBackendBottleneck(item) {
     level,
     badge: badgeForDiagnostic(kind, level),
     reason: item.reason || reasonForDiagnostic(kind, level),
+    recommendation: item.recommendation || recommendationForDiagnostic(kind),
     severity: Number(item.severity || 0),
   };
 }
@@ -120,4 +122,10 @@ function reasonForDiagnostic(kind, level) {
   if (kind === 'final_production_requirement') return 'final crafting process requirement';
   if (level === 'critical') return 'critical bottleneck';
   return 'ratio inefficiency';
+}
+
+function recommendationForDiagnostic(kind) {
+  if (kind === 'intermediate_scaling_requirement') return 'Build more upstream production for this item.';
+  if (kind === 'final_production_requirement') return 'Build enough final machines and verify final input delivery.';
+  return 'Accept idle time or scale the target rate to a cleaner ratio.';
 }
