@@ -484,3 +484,10 @@ function escapeHtml(value) {
     };
   }
 })();
+
+(function loadProductionDiagnosticsAdapter() {
+  if (document.querySelector('script[src="/ui_diagnostics_adapter.js"]')) return;
+  const script = document.createElement('script');
+  script.src = '/ui_diagnostics_adapter.js';
+  document.body.appendChild(script);
+})();
