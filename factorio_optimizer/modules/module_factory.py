@@ -5,6 +5,7 @@ from factorio_optimizer.core.objects import Position
 from factorio_optimizer.data.machines import Machine, get_best_machine_for_category, get_machine, get_machines_for_era
 from factorio_optimizer.data.recipes import get_recipe
 from factorio_optimizer.modules.generic_assembler_module import build_generic_assembler_module
+from factorio_optimizer.modules.generic_smelting_module import build_generic_smelting_module
 from factorio_optimizer.modules.module_base import FactoryModule
 
 
@@ -29,6 +30,14 @@ def create_module_for_recipe(
 
     if recipe.category in {"crafting", "crafting-with-fluid"}:
         return build_generic_assembler_module(
+            recipe_name=recipe_name,
+            module_id=module_id,
+            origin=origin,
+            machine_name=selected_machine.name,
+        )
+
+    if recipe.category == "smelting":
+        return build_generic_smelting_module(
             recipe_name=recipe_name,
             module_id=module_id,
             origin=origin,
