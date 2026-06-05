@@ -73,3 +73,11 @@ function renderPowerDiagnostics(chainTree, normalized) {
 
   chainTree.appendChild(diagnostics);
 }
+
+(function loadBuildListAdapter() {
+  const src = '/ui_build_list_adapter.js';
+  if (document.querySelector(`script[src="${src}"]`)) return;
+  const script = document.createElement('script');
+  script.src = src;
+  document.body.appendChild(script);
+})();
