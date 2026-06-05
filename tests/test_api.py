@@ -97,6 +97,19 @@ def test_blueprint_generation_endpoints() -> None:
     assert scaled["summary"]["block_count"] == 10
     assert scaled["diagnostics"]["planner_mode"] == "scaled_repeatable_early_science"
 
+    scaled_green = _assert_ok(
+        client.post(
+            "/api/generate-scaled-green-circuit-plan",
+            json={"rate": 300, "unit": "per_minute", "block_rate": 60, "block_unit": "per_minute"},
+        ),
+        "/api/generate-scaled-green-circuit-plan",
+    )
+    assert scaled_green["valid"] is True
+    assert scaled_green["summary"]["block_count"] == 4
+    assert scaled_green["summary"]["capacity_per_minute"] == 360.0
+    assert scaled_green["summary"]["block_rate_per_minute"] == 90.0
+    assert scaled_green["diagnostics"]["planner_mode"] == "scaled_repeatable_green_circuits"
+
 
 def test_optimize_rejects_bad_inputs() -> None:
     client = app.test_client()
@@ -122,6 +135,7 @@ def test_blueprint_routes_reject_bad_rates() -> None:
         "/api/generate-green-circuit-block",
         "/api/generate-red-science-block",
         "/api/generate-scaled-early-science-plan",
+        "/api/generate-scaled-green-circuit-plan",
     ]
 
     for endpoint in endpoints:
@@ -140,6 +154,18 @@ def test_scaled_early_science_route_rejects_invalid_block_rate() -> None:
     response = client.post(
         "/api/generate-scaled-early-science-plan",
         json={"rate": 30, "unit": "per_minute", "block_rate": 60, "block_unit": "per_minute"},
+    )
+
+    assert response.status_code == 400
+    assert "block_rate" in response.get_json()["error"]
+
+
+def test_scaled_green_circuit_route_rejects_invalid_block_rate() -> None:
+    client = app.test_client()
+
+    response = client.post(
+        "/api/generate-scaled-green-circuit-plan",
+        json={"rate": 60, "unit": "per_minute", "block_rate": 120, "block_unit": "per_minute"},
     )
 
     assert response.status_code == 400

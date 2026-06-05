@@ -374,6 +374,23 @@ async function runScaledEarlySciencePlanner() {
   );
 }
 
+async function runScaledGreenCircuitPlanner() {
+  const rate = parseFloat(document.getElementById('rate-input').value) || 300;
+  const unit = document.getElementById('rate-unit').value;
+  const targetPerMinute = unit === 'per_second' ? rate * 60 : rate;
+  const blockRate = targetPerMinute >= 240 ? 60 : 30;
+
+  await runMilestoneGenerator(
+    '/api/generate-scaled-green-circuit-plan',
+    `Scaled Green Circuit Plan (${targetPerMinute.toFixed(0)}/min)`,
+    {
+      block_rate: blockRate,
+      block_unit: 'per_minute',
+      era: state.machineEra === 'early' ? 'early' : 'mid',
+    },
+  );
+}
+
 async function runMilestoneGenerator(endpoint, label, extraBody = {}) {
   const rate = parseFloat(document.getElementById('rate-input').value) || 30;
   const unit = document.getElementById('rate-unit').value;

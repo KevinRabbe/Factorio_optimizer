@@ -4,6 +4,10 @@ from dataclasses import dataclass
 from math import ceil
 from typing import Any
 
+from factorio_optimizer.compiler.green_circuit_compiler import (
+    GreenCircuitBlockRequest,
+    compile_green_circuit_block,
+)
 from factorio_optimizer.compiler.mid_tier_compiler import (
     FactoryBlueprintReport,
     ScienceSliceRequest,
@@ -17,6 +21,16 @@ class ScaledEarlyScienceRequest:
     block_rate_per_second: float = 1.0
     machine_tier: str = "mid"
     transport_tier: str = "mid"
+    include_power_poles: bool = True
+
+
+@dataclass(frozen=True)
+class ScaledGreenCircuitRequest:
+    target_rate_per_second: float = 5.0
+    block_rate_per_second: float = 1.0
+    era: str = "mid"
+    belt_name: str = "transport_belt"
+    inserter_name: str = "inserter"
     include_power_poles: bool = True
 
 
@@ -66,10 +80,10 @@ def plan_scaled_early_science(request: ScaledEarlyScienceRequest) -> FactoryBlue
         {
             "name": f"Early Science Slice #{index + 1}",
             "blueprint": "repeat representative early science blueprint",
-            "target_per_minute": round(request.block_rate_per_second * 60.0, 4),
+            "target_per_minute": round(block.summary["capacity_per_minute"], 4),
             "outputs": {
-                "automation_science_pack": round(request.block_rate_per_second * 60.0, 4),
-                "logistic_science_pack": round(request.block_rate_per_second * 60.0, 4),
+                "automation_science_pack": round(block.summary["capacity_per_minute"], 4),
+                "logistic_science_pack": round(block.summary["capacity_per_minute"], 4),
             },
         }
         for index in range(block_count)
@@ -97,7 +111,7 @@ def plan_scaled_early_science(request: ScaledEarlyScienceRequest) -> FactoryBlue
         "capacity_per_minute": round(total_capacity_per_second * 60.0, 4),
         "machine_count": total_machine_count,
         "block_count": block_count,
-        "block_rate_per_minute": round(request.block_rate_per_second * 60.0, 4),
+        "block_rate_per_minute": round(block.summary["capacity_per_minute"], 4),
     }
 
     return FactoryBlueprintReport(
@@ -106,7 +120,96 @@ def plan_scaled_early_science(request: ScaledEarlyScienceRequest) -> FactoryBlue
         validation_confidence=block.validation_confidence,
         blueprint_string=block.blueprint_string,
         blueprint_json=block.blueprint_json,
-        ascii=_scaled_ascii(block_count, request.block_rate_per_second),
+        ascii=_scaled_ascii(block_count, request.block_rate_per_second, "R+G"),
+        summary=summary,
+        build_list=total_build_list,
+        diagnostics=diagnostics,
+    )
+
+
+def plan_scaled_green_circuits(request: ScaledGreenCircuitRequest) -> FactoryBlueprintReport:
+    if request.target_rate_per_second <= 0:
+        raise ValueError("target_rate_per_second must be greater than zero.")
+    if request.block_rate_per_second <= 0:
+        raise ValueError("block_rate_per_second must be greater than zero.")
+    if request.block_rate_per_second > request.target_rate_per_second:
+        raise ValueError("block_rate_per_second cannot be greater than target_rate_per_second.")
+
+    block = compile_green_circuit_block(
+        GreenCircuitBlockRequest(
+            target_rate_per_second=request.block_rate_per_second,
+            era=request.era,
+            belt_name=request.belt_name,
+            inserter_name=request.inserter_name,
+            include_power_poles=request.include_power_poles,
+        )
+    )
+    block_count = ceil(request.target_rate_per_second / block.summary["capacity_per_second"])
+    total_capacity_per_second = block_count * block.summary["capacity_per_second"]
+    total_build_list = _multiply_counts(block.build_list, block_count)
+    total_machine_count = int(total_build_list.get("assemblers", 0))
+    external_inputs = _multiply_rates(block.diagnostics.get("external_inputs", {}), block_count)
+    belt_capacity = float(block.diagnostics.get("belt_capacity_per_second", 15.0))
+    input_lanes = {
+        item: {
+            "rate_per_second": rate,
+            "rate_per_minute": round(rate * 60.0, 4),
+            "minimum_belts": max(1, ceil(rate / belt_capacity)),
+        }
+        for item, rate in external_inputs.items()
+    }
+    external_input_lanes = {
+        item: [
+            {
+                "pattern": f"{lane['minimum_belts']} belt lane(s) feeding {item.replace('_', ' ')} across {block_count} repeated blocks",
+            }
+        ]
+        for item, lane in input_lanes.items()
+    }
+    sections = [
+        {
+            "name": f"Green Circuit Block #{index + 1}",
+            "blueprint": "repeat representative green circuit blueprint",
+            "target_per_minute": round(block.summary["capacity_per_minute"], 4),
+            "outputs": {
+                "electronic_circuit": round(block.summary["capacity_per_minute"], 4),
+            },
+        }
+        for index in range(block_count)
+    ]
+    diagnostics = {
+        "planner_mode": "scaled_repeatable_green_circuits",
+        "representative_block": {
+            "capacity_per_minute": block.summary["capacity_per_minute"],
+            "machine_count": block.summary["green_assembler_count"] + block.summary["cable_assembler_count"],
+            "valid": block.valid,
+        },
+        "repeatable_blocks": block_count,
+        "external_inputs": external_inputs,
+        "input_lanes": input_lanes,
+        "external_input_lanes": external_input_lanes,
+        "train_readiness": _train_readiness(input_lanes),
+        "sections": sections,
+        "warnings": _warnings(request, total_capacity_per_second, block_count),
+    }
+    summary = {
+        "item": "scaled_green_circuits",
+        "target_rate_per_second": round(request.target_rate_per_second, 6),
+        "target_rate_per_minute": round(request.target_rate_per_second * 60.0, 4),
+        "capacity_per_second": round(total_capacity_per_second, 6),
+        "capacity_per_minute": round(total_capacity_per_second * 60.0, 4),
+        "machine_count": total_machine_count,
+        "block_count": block_count,
+        "block_rate_per_minute": round(block.summary["capacity_per_minute"], 4),
+    }
+
+    return FactoryBlueprintReport(
+        valid=block.valid,
+        validation_errors=block.validation_errors,
+        validation_confidence=block.validation_confidence,
+        blueprint_string=block.blueprint_string,
+        blueprint_json=block.blueprint_json,
+        ascii=_scaled_ascii(block_count, request.block_rate_per_second, "GC"),
         summary=summary,
         build_list=total_build_list,
         diagnostics=diagnostics,
@@ -152,7 +255,7 @@ def _train_readiness(input_lanes: dict[str, dict[str, float]]) -> dict[str, Any]
 
 
 def _warnings(
-    request: ScaledEarlyScienceRequest,
+    request: ScaledEarlyScienceRequest | ScaledGreenCircuitRequest,
     total_capacity_per_second: float,
     block_count: int,
 ) -> list[str]:
@@ -164,11 +267,11 @@ def _warnings(
     return warnings
 
 
-def _scaled_ascii(block_count: int, block_rate_per_second: float) -> str:
+def _scaled_ascii(block_count: int, block_rate_per_second: float, label: str) -> str:
     block_label = f"{round(block_rate_per_second * 60.0)}m"
-    chunks = [f"[R+G {block_label}]" for _ in range(block_count)]
+    chunks = [f"[{label} {block_label}]" for _ in range(block_count)]
     lines = [
-        "Scaled Red + Green Science Plan",
+        f"Scaled {label} Plan",
         " ".join(chunks),
         "I: iron/copper/cable inputs  O: science outputs",
         "Use the representative blueprint string once, then paste it for each block.",

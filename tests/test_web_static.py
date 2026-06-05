@@ -56,5 +56,8 @@ def test_blueprint_button_routes_to_practical_generators() -> None:
     assert "'chemical_science_pack'" in response_js
     assert "'military_science_pack'" in response_js
     assert "function runScaledEarlySciencePlanner" in app_js
+    assert "function runScaledGreenCircuitPlanner" in app_js
     assert "/api/generate-scaled-early-science-plan" in app_js
+    assert "/api/generate-scaled-green-circuit-plan" in app_js
     assert "Plan Scaled Red + Green" in index_html
+    assert "Plan Scaled Green Circuits" in index_html
