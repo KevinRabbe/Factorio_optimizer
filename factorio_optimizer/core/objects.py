@@ -14,6 +14,11 @@ ObjectType = Literal[
     "inserter",
     "belt",
     "splitter",
+    "electric_pole",
+    "pipe",
+    "chemical_plant",
+    "refinery",
+    "lab",
 ]
 
 

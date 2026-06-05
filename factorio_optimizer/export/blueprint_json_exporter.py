@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from factorio_optimizer.core.blueprint_plan import BlueprintPlan
+from factorio_optimizer.data.entities import entity_center
 
 
 FACTORIO_DIRECTIONS = {
@@ -18,6 +19,11 @@ ENTITY_NAMES = {
     "assembler": "assembling-machine-1",
     "furnace": "stone-furnace",
     "splitter": "splitter",
+    "electric_pole": "small-electric-pole",
+    "pipe": "pipe",
+    "chemical_plant": "chemical-plant",
+    "refinery": "oil-refinery",
+    "lab": "lab",
 }
 
 # Factorio 2.0+ blueprint version used as a placeholder for now.
@@ -37,17 +43,23 @@ def export_plan_to_blueprint_json(plan: BlueprintPlan) -> dict[str, Any]:
         if entity_name is None:
             continue
 
+        center_x, center_y = entity_center(
+            obj.position.x,
+            obj.position.y,
+            obj.width,
+            obj.height,
+        )
         entity: dict[str, Any] = {
             "entity_number": entity_number,
             "name": entity_name,
             "position": {
-                "x": obj.position.x,
-                "y": obj.position.y,
+                "x": center_x,
+                "y": center_y,
             },
             "direction": FACTORIO_DIRECTIONS[obj.direction],
         }
 
-        if obj.object_type in {"assembler", "furnace"} and obj.recipe is not None:
+        if obj.object_type in {"assembler", "furnace", "chemical_plant", "refinery"} and obj.recipe is not None:
             entity["recipe"] = obj.recipe
 
         entities.append(entity)

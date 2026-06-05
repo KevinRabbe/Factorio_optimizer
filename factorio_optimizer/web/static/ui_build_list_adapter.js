@@ -88,11 +88,18 @@ function renderBuildList(chainTree, normalized) {
   }
 
   const grouped = groupBuildListItems(items);
+  const totals = summarizeBuildListItems(items);
+  const totalChips = Object.entries(totals.byCategory).map(([category, count]) => `
+    <span class="build-total-chip">${escapeHtml(categoryLabel(category))}: <strong>×${Number(count || 0)}</strong></span>
+  `).join('');
   const rows = Object.entries(grouped).map(([block, blockItems]) => `
-    <div class="cn-energy">
-      <strong>${escapeHtml(blockLabel(block))}</strong>
+    <details class="build-block" ${block === 'local_crafting_block' ? 'open' : ''}>
+      <summary>
+        <span>${escapeHtml(blockLabel(block))}</span>
+        <span class="build-summary-meta">${blockItems.length} rows · ${sumBuildCount(blockItems)} parts</span>
+      </summary>
       ${renderBlockCategories(blockItems)}
-    </div>
+    </details>
   `).join('');
 
   diagnostics.innerHTML = `
@@ -102,8 +109,9 @@ function renderBuildList(chainTree, normalized) {
         <div class="cn-name">Build List</div>
         <div class="cn-machine">${escapeHtml(strategyLabel(strategy))} · approximate physical parts needed.</div>
       </div>
-      <div class="cn-stats"><span class="cn-count">${items.length}</span><span class="cn-rate">items</span></div>
+      <div class="cn-stats"><span class="cn-count">${totals.totalParts}</span><span class="cn-rate">parts</span></div>
     </div>
+    <div class="build-total-row">${totalChips}</div>
     ${rows}`;
 
   chainTree.appendChild(diagnostics);
@@ -118,16 +126,36 @@ function renderBlockCategories(items) {
   }
 
   return Object.entries(byCategory).map(([category, categoryItems]) => `
-    <div style="margin-top:8px; padding-left:12px">
-      <strong>${escapeHtml(categoryLabel(category))}</strong>
+    <details class="build-category">
+      <summary>
+        <span>${escapeHtml(categoryLabel(category))}</span>
+        <span class="build-summary-meta">×${sumBuildCount(categoryItems)}</span>
+      </summary>
       ${categoryItems.map(item => `
-        <div style="margin-top:4px; padding-left:12px">
-          ×${Number(item.count || 0)} ${escapeHtml(item.display_name || item.entity)}
-          <span style="opacity:0.72">— ${escapeHtml(item.note || '')}</span>
+        <div class="build-line-item">
+          <span class="build-count">×${Number(item.count || 0)}</span>
+          <span>${escapeHtml(item.display_name || item.entity)}</span>
+          <span class="build-note">${escapeHtml(item.note || '')}</span>
         </div>
       `).join('')}
-    </div>
+    </details>
   `).join('');
+}
+
+function summarizeBuildListItems(items) {
+  const byCategory = {};
+  let totalParts = 0;
+  for (const item of items) {
+    const count = Number(item.count || 0);
+    const category = item.category || 'other';
+    totalParts += count;
+    byCategory[category] = (byCategory[category] || 0) + count;
+  }
+  return { totalParts, byCategory };
+}
+
+function sumBuildCount(items) {
+  return items.reduce((sum, item) => sum + Number(item.count || 0), 0);
 }
 
 function groupBuildListItems(items) {

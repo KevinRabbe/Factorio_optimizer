@@ -42,4 +42,19 @@ def _symbol_for_object(object_type: str, role: str | None) -> str:
     if object_type == "splitter":
         return "S"
 
+    if object_type == "electric_pole":
+        return "P"
+
+    if object_type == "pipe":
+        return "|"
+
+    if object_type == "chemical_plant":
+        return "C"
+
+    if object_type == "refinery":
+        return "R"
+
+    if object_type == "lab":
+        return "L"
+
     return "?"

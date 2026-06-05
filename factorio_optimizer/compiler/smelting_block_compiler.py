@@ -5,13 +5,16 @@ from math import ceil
 from typing import Any
 
 from factorio_optimizer.core.blueprint_plan import BlueprintPlan
-from factorio_optimizer.core.objects import FactoryObject, Position
+from factorio_optimizer.compiler.blueprint_blocks import (
+    belt_line,
+    build_entity_counts,
+    compile_blueprint_artifacts,
+    furnace,
+    inserter,
+)
+from factorio_optimizer.data.entities import get_entity_spec
 from factorio_optimizer.data.machines import get_machine
 from factorio_optimizer.data.recipes import get_recipe
-from factorio_optimizer.export.blueprint_json_exporter import export_plan_to_blueprint_json
-from factorio_optimizer.export.blueprint_string_encoder import encode_blueprint_string
-from factorio_optimizer.render.ascii_renderer import render_ascii
-from factorio_optimizer.validation.structure_validator import validate_plan_structure
 
 
 SMELTING_RECIPES = {"iron_plate", "copper_plate", "steel_plate", "stone_brick"}
@@ -43,6 +46,7 @@ class SmeltingBlockReport:
     height: int
     structure_valid: bool
     validation_errors: list[str]
+    validation_confidence: dict[str, object]
     ascii: str
     blueprint_json: dict[str, Any]
     blueprint_string: str
@@ -64,6 +68,7 @@ class SmeltingBlockReport:
             "structure_valid": self.structure_valid,
             "valid": self.structure_valid,
             "validation_errors": self.validation_errors,
+            "validation_confidence": self.validation_confidence,
             "ascii": self.ascii,
             "blueprint_json": self.blueprint_json,
             "blueprint_string": self.blueprint_string,
@@ -93,7 +98,8 @@ def compile_smelting_block(request: SmeltingBlockRequest) -> SmeltingBlockReport
     row_count = ceil(machine_count / max_per_row)
     furnaces_per_row = min(machine_count, max_per_row)
     width = 4 + furnaces_per_row * 3
-    height = 2 + row_count * 5
+    height = row_count * 7
+    machine_spec = get_entity_spec(request.machine_name.replace("_", "-"))
 
     plan = _build_plan(
         recipe_name=request.recipe_name,
@@ -105,11 +111,13 @@ def compile_smelting_block(request: SmeltingBlockRequest) -> SmeltingBlockReport
         furnaces_per_row=furnaces_per_row,
         width=width,
         height=height,
+        machine_width=machine_spec.width,
+        machine_height=machine_spec.height,
+        belt_name=request.belt_name,
+        inserter_name=request.inserter_name,
     )
 
-    structure = validate_plan_structure(plan)
-    blueprint_json = export_plan_to_blueprint_json(plan)
-    blueprint_string = encode_blueprint_string(blueprint_json)
+    artifacts = compile_blueprint_artifacts(plan)
 
     return SmeltingBlockReport(
         recipe_name=request.recipe_name,
@@ -124,11 +132,12 @@ def compile_smelting_block(request: SmeltingBlockRequest) -> SmeltingBlockReport
         furnaces_per_row=furnaces_per_row,
         width=plan.width,
         height=plan.height,
-        structure_valid=structure.passed,
-        validation_errors=structure.errors,
-        ascii=render_ascii(plan),
-        blueprint_json=blueprint_json,
-        blueprint_string=blueprint_string,
+        structure_valid=artifacts.valid,
+        validation_errors=artifacts.validation_errors,
+        validation_confidence=artifacts.validation.to_dict(),
+        ascii=artifacts.ascii,
+        blueprint_json=artifacts.blueprint_json,
+        blueprint_string=artifacts.blueprint_string,
     )
 
 
@@ -142,54 +151,55 @@ def _build_plan(
     furnaces_per_row: int,
     width: int,
     height: int,
+    machine_width: int,
+    machine_height: int,
+    belt_name: str,
+    inserter_name: str,
 ) -> BlueprintPlan:
-    objects: list[FactoryObject] = []
+    objects = []
     furnace_index = 0
 
     for row in range(row_count):
-        y_base = 1 + row * 5
+        y_base = row * 7
         row_remaining = machine_count - furnace_index
         row_furnaces = min(furnaces_per_row, row_remaining)
 
-        for x in range(width):
-            objects.append(_belt(f"row_{row}_input_belt_{x}", x, y_base, input_item))
-            objects.append(_belt(f"row_{row}_output_belt_{x}", x, y_base + 4, output_item))
+        objects.extend(belt_line(f"row_{row}_input_belt", 0, y_base, width, input_item, "east", belt_name))
+        objects.extend(belt_line(f"row_{row}_output_belt", 0, y_base + 5, width, output_item, "east", belt_name))
 
         for col in range(row_furnaces):
             x_base = 2 + col * 3
             objects.append(
-                FactoryObject(
-                    object_id=f"furnace_{furnace_index}",
-                    object_type="furnace",
-                    position=Position(x_base, y_base + 1),
-                    direction="north",
-                    width=2,
-                    height=2,
-                    recipe=recipe_name,
-                    role="producer",
-                    entity_name=machine_name.replace("_", "-"),
+                furnace(
+                    f"furnace_{furnace_index}",
+                    x_base,
+                    y_base + 2,
+                    recipe_name,
+                    machine_name,
+                    width=machine_width,
+                    height=machine_height,
                 )
             )
             objects.append(
-                FactoryObject(
-                    object_id=f"furnace_{furnace_index}_input_inserter",
-                    object_type="inserter",
-                    position=Position(x_base, y_base),
-                    direction="south",
-                    item=input_item,
-                    role="ingredient_transfer",
-                    entity_name="inserter",
+                inserter(
+                    f"furnace_{furnace_index}_input_inserter",
+                    x_base,
+                    y_base + 1,
+                    "south",
+                    input_item,
+                    "ingredient_transfer",
+                    inserter_name,
                 )
             )
             objects.append(
-                FactoryObject(
-                    object_id=f"furnace_{furnace_index}_output_inserter",
-                    object_type="inserter",
-                    position=Position(x_base, y_base + 3),
-                    direction="south",
-                    item=output_item,
-                    role="product_transfer",
-                    entity_name="inserter",
+                inserter(
+                    f"furnace_{furnace_index}_output_inserter",
+                    x_base,
+                    y_base + 4,
+                    "south",
+                    output_item,
+                    "product_transfer",
+                    inserter_name,
                 )
             )
             furnace_index += 1
@@ -200,19 +210,6 @@ def _build_plan(
         height=height,
         objects=objects,
     )
-
-
-def _belt(object_id: str, x: int, y: int, item: str) -> FactoryObject:
-    return FactoryObject(
-        object_id=object_id,
-        object_type="belt",
-        position=Position(x, y),
-        direction="east",
-        item=item,
-        entity_name="transport-belt",
-    )
-
-
 def _single_item(items: dict[str, float]) -> str:
     if len(items) != 1:
         raise ValueError("Smelting block compiler currently supports exactly one input/output item.")

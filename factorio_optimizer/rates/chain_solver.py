@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from math import ceil
 
+from factorio_optimizer.core.errors import DomainError
 from factorio_optimizer.data.items import is_raw_resource
 from factorio_optimizer.data.machines import Machine, get_machine
 from factorio_optimizer.data.modules import ModuleConfig, compute_module_effects
@@ -147,6 +148,8 @@ def solve_chain(
     modules = modules or []
     _visited = _visited or set()
     saved_layouts = saved_layouts or {}
+    if target_per_second <= 0:
+        raise DomainError("target_per_second must be greater than zero.")
     item_meta = get_item(item)
 
     if item in saved_layouts and item not in _visited:
@@ -183,7 +186,11 @@ def solve_chain(
             children=[],
         )
 
-    if is_raw_resource(item) or not has_recipe(item) or item in _visited:
+    if item in _visited:
+        cycle = " -> ".join([*_visited, item])
+        raise DomainError(f"Recipe dependency cycle detected: {cycle}.")
+
+    if is_raw_resource(item):
         return ChainNode(
             item=item,
             display_name=item_meta.display_name,
@@ -207,6 +214,9 @@ def solve_chain(
             blackbox_raw_inputs={},
             children=[],
         )
+
+    if not has_recipe(item):
+        raise DomainError(f"Item {item!r} is not raw and has no known recipe.")
 
     _visited = _visited | {item}
     recipe = get_recipe(item)

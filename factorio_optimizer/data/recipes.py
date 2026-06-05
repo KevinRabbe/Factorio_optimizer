@@ -146,6 +146,12 @@ RECIPES: dict[str, Recipe] = {
         outputs={"fast_inserter": 1},
         crafting_time_seconds=0.5,
     ),
+    "fast_transport_belt": Recipe(
+        name="fast_transport_belt",
+        inputs={"iron_gear_wheel": 5, "transport_belt": 1},
+        outputs={"fast_transport_belt": 1},
+        crafting_time_seconds=0.5,
+    ),
     "engine_unit": Recipe(
         name="engine_unit",
         inputs={"steel_plate": 1, "iron_gear_wheel": 1, "pipe": 2},
@@ -303,7 +309,7 @@ RECIPES: dict[str, Recipe] = {
         },
         outputs={"chemical_science_pack": 2},
         crafting_time_seconds=24.0,
-        category="chemistry",
+        category="crafting-with-fluid",
     ),
     "production_science_pack": Recipe(
         name="production_science_pack",

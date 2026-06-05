@@ -1159,6 +1159,221 @@ body {
   border-color: var(--amber);
 }
 
+.ascii-preview {
+  max-height: 320px;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--bg-deep);
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre;
+}
+
+.build-total-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 8px;
+}
+
+.build-total-chip {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-deep);
+  color: var(--text-sec);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.build-total-chip strong {
+  color: var(--amber);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.build-block,
+.build-category {
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.build-block > summary,
+.build-category > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 800;
+  list-style: none;
+}
+
+.build-block > summary::-webkit-details-marker,
+.build-category > summary::-webkit-details-marker {
+  display: none;
+}
+
+.build-block > summary::before,
+.build-category > summary::before {
+  content: "▸";
+  color: var(--amber);
+  margin-right: 6px;
+}
+
+.build-block[open] > summary::before,
+.build-category[open] > summary::before {
+  content: "▾";
+}
+
+.build-category {
+  margin: 8px 10px;
+  background: var(--bg-card);
+}
+
+.build-summary-meta {
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.build-line-item {
+  display: grid;
+  grid-template-columns: 52px minmax(120px, 1fr) minmax(160px, 2fr);
+  gap: 8px;
+  padding: 5px 10px 5px 22px;
+  border-top: 1px solid var(--border);
+  color: var(--text-sec);
+  font-size: 0.73rem;
+}
+
+.build-count {
+  color: var(--amber);
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 800;
+}
+
+.build-note {
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+}
+
+.blueprint-build-summary {
+  margin: 14px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-deep);
+}
+
+.blueprint-build-summary > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 800;
+  list-style: none;
+}
+
+.blueprint-build-summary > summary::-webkit-details-marker {
+  display: none;
+}
+
+.blueprint-build-summary > summary::before {
+  content: "▾";
+  color: var(--amber);
+  margin-right: 6px;
+}
+
+.blueprint-build-summary:not([open]) > summary::before {
+  content: "▸";
+}
+
+.blueprint-build-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.blueprint-build-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-card);
+  color: var(--text-sec);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.blueprint-build-chip strong {
+  color: var(--amber);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.lane-guide {
+  margin: 14px 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-deep);
+}
+
+.lane-section-label {
+  margin: 10px 0 6px;
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.lane-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.lane-row:last-child { border-bottom: none; }
+
+.lane-output .lane-rate { color: var(--green); }
+
+.lane-item {
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.78rem;
+  text-transform: capitalize;
+}
+
+.lane-note {
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  margin-top: 2px;
+}
+
+.lane-rate {
+  flex: 0 0 auto;
+  color: var(--amber);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
 .saved-layout-card {
   padding: 10px;
   background: var(--bg-card);

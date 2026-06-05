@@ -347,6 +347,198 @@ async function runOptimize() {
 }
 
 // ── Results rendering ──────────────────────────────────────────────────────
+async function runSelectedMidBlock() {
+  if (!state.selectedItem) {
+    alert('Select a mid-tier item first.');
+    return;
+  }
+  await runMilestoneGenerator('/api/generate-mid-tier-slice', `${state.selectedItem.display_name} Slice`, {
+    item: state.selectedItem.name,
+    strategy: 'readable',
+  });
+}
+
+async function runMilestoneGenerator(endpoint, label, extraBody = {}) {
+  const rate = parseFloat(document.getElementById('rate-input').value) || 30;
+  const unit = document.getElementById('rate-unit').value;
+  const body = {
+    rate,
+    unit,
+    machine_tier: state.machineEra === 'early' ? 'early' : 'mid',
+    transport_tier: state.machineEra === 'early' ? 'early' : 'mid',
+    fluid_mode: 'external',
+    ...extraBody,
+  };
+
+  setResultsState('loading');
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    state.lastResult = data;
+    renderBlueprintReport(label, data);
+  } catch (err) {
+    setResultsState('placeholder');
+    alert(`Blueprint generation failed: ${err.message}`);
+  }
+}
+
+function renderBlueprintReport(label, data) {
+  setResultsState('results');
+  state.activeResultTab = 'best';
+  updateResultTabButtons();
+
+  const summary = data.summary || {};
+  const diagnostics = data.diagnostics || {};
+  const warnings = diagnostics.warnings || [];
+  const externalInputs = Object.keys(diagnostics.external_inputs || {});
+  const laneGuideHtml = renderLaneGuide(diagnostics);
+  const buildSummaryHtml = renderBlueprintBuildSummary(data.build_list || {});
+
+  document.getElementById('summary-cards').innerHTML = `
+    <div class="summary-card ${data.valid ? 'card-green' : 'card-purple'}">
+      <div class="sc-icon">${data.valid ? 'OK' : '!'}</div>
+      <div class="sc-value">${data.valid ? 'Valid' : 'Check'}</div>
+      <div class="sc-label">Blueprint Confidence</div>
+    </div>
+    <div class="summary-card card-blue">
+      <div class="sc-icon">/m</div>
+      <div class="sc-value">${(summary.capacity_per_minute || 0).toFixed(1)}</div>
+      <div class="sc-label">Capacity / min</div>
+    </div>
+    <div class="summary-card card-amber">
+      <div class="sc-icon">M</div>
+      <div class="sc-value">${summary.machine_count || 0}</div>
+      <div class="sc-label">Machines</div>
+    </div>`;
+
+  document.getElementById('chain-tree').innerHTML = `
+    <div class="energy-card">
+      <div class="energy-card-title">${escapeHtml(label)}</div>
+      <div class="energy-row">
+        <span class="energy-row-label">External inputs</span>
+        <span class="energy-row-val">${externalInputs.length ? externalInputs.join(', ') : 'none'}</span>
+      </div>
+      <div class="energy-row">
+        <span class="energy-row-label">Warnings</span>
+        <span class="energy-row-val">${warnings.length ? warnings.join('; ') : 'none'}</span>
+      </div>
+      <button class="save-layout-btn" onclick="copyBlueprintString()">Copy Blueprint String</button>
+      ${buildSummaryHtml}
+      ${laneGuideHtml}
+      <pre class="ascii-preview">${escapeHtml(data.ascii || '')}</pre>
+    </div>`;
+  document.getElementById('compare-table').innerHTML = '<div class="loading-spinner">Blueprint generator reports do not include plan comparison yet.</div>';
+  document.getElementById('energy-view').innerHTML = `<pre class="ascii-preview">${escapeHtml(JSON.stringify(data.validation_confidence || {}, null, 2))}</pre>`;
+  document.getElementById('raw-inputs-view').innerHTML = laneGuideHtml || `<pre class="ascii-preview">${escapeHtml(JSON.stringify(diagnostics.external_inputs || {}, null, 2))}</pre>`;
+  showResultTab('best');
+}
+
+function renderBlueprintBuildSummary(buildList) {
+  const entries = Object.entries(buildList)
+    .filter(([, count]) => typeof count === 'number' && count > 0)
+    .sort((a, b) => b[1] - a[1]);
+  if (!entries.length) return '';
+
+  const total = entries.reduce((sum, [, count]) => sum + count, 0);
+  const chips = entries.map(([name, count]) => `
+    <span class="blueprint-build-chip">
+      <span>${escapeHtml(formatBuildName(name))}</span>
+      <strong>×${Number(count || 0)}</strong>
+    </span>
+  `).join('');
+
+  return `
+    <details class="blueprint-build-summary" open>
+      <summary>
+        <span>Build Summary</span>
+        <span class="build-summary-meta">${total} total entities</span>
+      </summary>
+      <div class="blueprint-build-chip-row">${chips}</div>
+    </details>`;
+}
+
+function formatBuildName(name) {
+  return String(name)
+    .replace(/s$/, '')
+    .replaceAll('_', ' ');
+}
+
+function renderLaneGuide(diagnostics) {
+  const inputLanes = diagnostics.external_input_lanes || {};
+  const outputLanes = diagnostics.output_lanes || {};
+  const rates = diagnostics.external_inputs || {};
+  const inputRows = Object.entries(inputLanes).map(([item, points]) => {
+    const rate = rates[item];
+    const rateText = typeof rate === 'number' ? `${rate.toFixed(3)}/s` : 'see upstream';
+    const pointText = formatLanePoints(points);
+    return `
+      <div class="lane-row">
+        <div>
+          <div class="lane-item">${escapeHtml(formatItemName(item))}</div>
+          <div class="lane-note">${escapeHtml(pointText)}</div>
+        </div>
+        <span class="lane-rate">${escapeHtml(rateText)}</span>
+      </div>`;
+  }).join('');
+  const outputRows = Object.entries(outputLanes).map(([item, lane]) => `
+    <div class="lane-row lane-output">
+      <div>
+        <div class="lane-item">${escapeHtml(formatItemName(item))}</div>
+        <div class="lane-note">${escapeHtml(formatOutputLane(lane))}</div>
+      </div>
+      <span class="lane-rate">output</span>
+    </div>`).join('');
+  if (!inputRows && !outputRows) return '';
+  return `
+    <div class="lane-guide">
+      <div class="energy-card-title">Feed / Output Lane Guide</div>
+      ${inputRows ? `<div class="lane-section-label">Inputs</div>${inputRows}` : ''}
+      ${outputRows ? `<div class="lane-section-label">Outputs</div>${outputRows}` : ''}
+    </div>`;
+}
+
+function formatLanePoints(points) {
+  if (!Array.isArray(points)) return 'no coordinate data';
+  return points.map(point => {
+    if (point.pattern) return point.pattern;
+    if (typeof point.x === 'number' && typeof point.y === 'number') return `tile (${point.x}, ${point.y})`;
+    return JSON.stringify(point);
+  }).join(', ');
+}
+
+function formatOutputLane(lane) {
+  const parts = [];
+  if (lane.main_bus_start) parts.push(`starts at (${lane.main_bus_start.x}, ${lane.main_bus_start.y})`);
+  if (lane.feeds_lab) parts.push('feeds lab');
+  if (lane.exits_right) parts.push('exits right');
+  return parts.join(' · ') || 'output lane';
+}
+
+function formatItemName(item) {
+  return String(item).replaceAll('_', ' ');
+}
+
+async function copyBlueprintString() {
+  const blueprint = state.lastResult?.blueprint_string;
+  if (!blueprint) return;
+  await navigator.clipboard.writeText(blueprint);
+  showToast();
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
 function setResultsState(state) {
   document.getElementById('results-placeholder').style.display = state === 'placeholder' ? '' : 'none';
   document.getElementById('results-loading').style.display = state === 'loading' ? '' : 'none';
@@ -825,4 +1017,3 @@ function loadLayout(id) {
 // ── Boot ───────────────────────────────────────────────────────────────────
 init();
 loadSavedLayouts();
-

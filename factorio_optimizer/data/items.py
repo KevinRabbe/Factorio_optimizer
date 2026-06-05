@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from factorio_optimizer.core.errors import DomainError
+
 
 # Raw resources that the solver treats as leaves (no recipe needed)
 RAW_RESOURCES: frozenset[str] = frozenset({
@@ -59,6 +61,7 @@ ITEMS: dict[str, ItemMeta] = {
     "underground_belt":ItemMeta("underground_belt","Underground Belt","early","logistics",   "🔽"),
     "splitter":       ItemMeta("splitter",        "Splitter",       "early", "logistics",    "↔️"),
     "inserter":       ItemMeta("inserter",        "Inserter",       "early", "logistics",    "🦾"),
+    "fast_transport_belt": ItemMeta("fast_transport_belt", "Fast Transport Belt", "mid", "logistics", "⚡"),
     "fast_inserter":  ItemMeta("fast_inserter",   "Fast Inserter",  "mid",   "logistics",    "⚡"),
     "small_electric_pole": ItemMeta("small_electric_pole", "Small Electric Pole", "early", "logistics", "🔋"),
     "medium_electric_pole": ItemMeta("medium_electric_pole", "Medium Electric Pole", "mid", "logistics", "🔋"),
@@ -117,7 +120,14 @@ ITEMS: dict[str, ItemMeta] = {
 
 
 def get_item(item_name: str) -> ItemMeta:
-    return ITEMS.get(item_name, ItemMeta(item_name, item_name.replace("_", " ").title(), "early", "intermediate", "📦"))
+    try:
+        return ITEMS[item_name]
+    except KeyError as exc:
+        raise DomainError(f"Unknown item: {item_name!r}") from exc
+
+
+def has_item(item_name: str) -> bool:
+    return item_name in ITEMS
 
 
 def is_raw_resource(item_name: str) -> bool:

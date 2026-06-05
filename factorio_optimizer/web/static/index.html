@@ -137,6 +137,22 @@
       <span class="optimize-icon">▶</span>
       <span id="optimize-btn-text">Select an item first</span>
     </button>
+    <div class="config-section">
+      <label class="config-label">Pasteable Milestones
+        <span class="label-note">Vanilla mid-tier connected slices</span>
+      </label>
+      <div class="toggle-row">
+        <button class="toggle-btn" onclick="runMilestoneGenerator('/api/generate-early-science-slice', 'Early Science Slice')">
+          Red + Green Slice
+        </button>
+        <button class="toggle-btn" onclick="runMilestoneGenerator('/api/generate-blue-science-slice', 'Blue Science Slice')">
+          Blue Science Slice
+        </button>
+      </div>
+      <button class="toggle-btn" style="width:100%; margin-top:8px" onclick="runSelectedMidBlock()">
+        Generate Selected Mid Block
+      </button>
+    </div>
   </section>
 
   <!-- ─── RIGHT PANEL: Results ─────────────────────────────── -->

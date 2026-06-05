@@ -78,14 +78,12 @@ def compile_module_blueprint(request: ModuleBlueprintRequest) -> ModuleBlueprint
     )
 
     output_item = module.output_rates[0].item if module.output_rates else request.recipe_name
-    recipe_validation = validate_recipe_plan(
-        plan,
-        RecipeValidationSpec(
-            recipe=request.recipe_name,
-            input_items=tuple(rate.item for rate in module.input_rates),
-            output_item=output_item,
-        ),
+    recipe_spec = RecipeValidationSpec(
+        recipe=request.recipe_name,
+        input_items=tuple(rate.item for rate in module.input_rates),
+        output_item=output_item,
     )
+    recipe_validation = validate_recipe_plan(plan, recipe_spec)
     structure_validation = validate_plan_structure(plan)
     connection_validation = validate_module_connections(module)
     validation_errors = [

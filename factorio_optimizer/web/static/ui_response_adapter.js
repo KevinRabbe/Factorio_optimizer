@@ -319,21 +319,21 @@ async function runGenerateModuleBlueprint() {
   setResultsState('loading');
 
   try {
-    const res = await fetch('/api/generate-module-blueprint', {
+    const request = selectedBlueprintRequest();
+    const res = await fetch(request.endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        recipe_name: state.selectedItem.name,
-        era: state.machineEra,
-        machine_name: selectedBlueprintMachineName(),
-        seed: 0,
-      }),
+      body: JSON.stringify(request.body),
     });
     const data = await res.json();
     if (!res.ok || data.error) throw new Error(data.error || 'Blueprint generation failed.');
 
     state.lastBlueprintReport = data;
-    renderModuleBlueprintReport(data);
+    if (request.usesPracticalReport && typeof renderBlueprintReport === 'function') {
+      renderBlueprintReport(request.label, data);
+    } else {
+      renderModuleBlueprintReport(data);
+    }
   } catch (err) {
     setResultsState('placeholder');
     alert(`Blueprint generation failed: ${err.message}`);
@@ -341,6 +341,122 @@ async function runGenerateModuleBlueprint() {
     if (btn) btn.disabled = !state.selectedItem;
     if (text) text.textContent = oldText || `Generate Blueprint — ${state.selectedItem?.display_name || ''}`;
   }
+}
+
+function selectedBlueprintRequest() {
+  const item = state.selectedItem?.name;
+  const displayName = state.selectedItem?.display_name || item || 'Blueprint';
+  const era = state.machineEra || 'early';
+  const rate = parseFloat(document.getElementById('rate-input')?.value) || 30;
+  const unit = document.getElementById('rate-unit')?.value || 'per_minute';
+  const tier = era === 'early' ? 'early' : 'mid';
+  const commonBody = {
+    rate,
+    unit,
+    machine_tier: tier,
+    transport_tier: tier,
+    fluid_mode: 'external',
+    include_power_poles: true,
+  };
+
+  if (item === 'electronic_circuit') {
+    return {
+      endpoint: '/api/generate-green-circuit-block',
+      label: 'Green Circuit Block',
+      usesPracticalReport: true,
+      body: {
+        rate,
+        unit,
+        era: tier,
+        include_power_poles: true,
+      },
+    };
+  }
+
+  if (item === 'automation_science_pack') {
+    return {
+      endpoint: '/api/generate-red-science-block',
+      label: 'Red Science Block',
+      usesPracticalReport: true,
+      body: {
+        rate,
+        unit,
+        era,
+        include_power_poles: true,
+      },
+    };
+  }
+
+  if (item === 'logistic_science_pack') {
+    return {
+      endpoint: '/api/generate-early-science-slice',
+      label: 'Red + Green Science Slice',
+      usesPracticalReport: true,
+      body: commonBody,
+    };
+  }
+
+  if (practicalMidTierItems().includes(item)) {
+    return {
+      endpoint: '/api/generate-mid-tier-slice',
+      label: `${displayName} Slice`,
+      usesPracticalReport: true,
+      body: {
+        ...commonBody,
+        item,
+        strategy: 'readable',
+      },
+    };
+  }
+
+  if (isLikelySmeltingRecipe(item)) {
+    return {
+      endpoint: '/api/generate-smelting-block',
+      label: `${displayName} Smelting Block`,
+      usesPracticalReport: true,
+      body: {
+        rate,
+        unit,
+        item,
+        machine_name: selectedFurnaceMachineName(),
+        belt_name: tier === 'mid' ? 'fast_transport_belt' : 'transport_belt',
+        inserter_name: tier === 'mid' ? 'fast_inserter' : 'inserter',
+      },
+    };
+  }
+
+  return {
+    endpoint: '/api/generate-module-blueprint',
+    label: `${displayName} Module`,
+    usesPracticalReport: false,
+    body: {
+      recipe_name: item,
+      era,
+      machine_name: selectedBlueprintMachineName(),
+      seed: 0,
+    },
+  };
+}
+
+function practicalMidTierItems() {
+  return [
+    'chemical_science_pack',
+    'military_science_pack',
+    'steel_plate',
+    'advanced_circuit',
+    'engine_unit',
+    'plastic_bar',
+    'sulfur',
+    'sulfuric_acid',
+    'battery',
+    'piercing_rounds_magazine',
+    'grenade',
+    'stone_wall',
+    'fast_inserter',
+    'fast_transport_belt',
+    'electric_engine_unit',
+    'flying_robot_frame',
+  ];
 }
 
 function selectedBlueprintMachineName() {

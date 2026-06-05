@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from factorio_optimizer.core.objects import Direction, FactoryObject, Position
+from factorio_optimizer.data.entities import get_entity_spec
 from factorio_optimizer.segments.ports import SegmentPort
 from factorio_optimizer.segments.segment_base import Segment
 
@@ -18,6 +19,9 @@ class FurnaceSegment(Segment):
 
     def __post_init__(self) -> None:
         self.segment_type = "furnace_segment"
+        spec = get_entity_spec(self.machine_type.replace("_", "-"))
+        self.width = spec.width
+        self.height = spec.height
         self.ports = self._build_ports()
 
     def expand(self) -> list[FactoryObject]:

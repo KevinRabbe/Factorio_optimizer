@@ -7,6 +7,7 @@ from factorio_optimizer.modules.connections import ModuleConnection
 from factorio_optimizer.modules.module_base import FactoryModule, Footprint, ModuleRate
 from factorio_optimizer.segments.assembler_segment import create_assembler_segment
 from factorio_optimizer.segments.belt_segment import create_belt_segment
+from factorio_optimizer.segments.electric_pole_segment import create_electric_pole_segment
 from factorio_optimizer.segments.inserter_segment import create_inserter_transfer_segment
 from factorio_optimizer.segments.interface_segment import create_interface_segment
 
@@ -74,6 +75,12 @@ def build_generic_assembler_module(
         machine_type=machine_name,
     )
     segments.append(assembler)
+    segments.append(
+        create_electric_pole_segment(
+            segment_id=f"{module_id}_power_pole",
+            position=Position(assembler_x + 1, assembler_y - 1),
+        )
+    )
 
     output_lane_y = assembler_y + 1
     segments.extend(
