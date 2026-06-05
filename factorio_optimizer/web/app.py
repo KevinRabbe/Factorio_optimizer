@@ -10,6 +10,10 @@ from factorio_optimizer.compiler.module_blueprint_compiler import (
 )
 from factorio_optimizer.compiler.request import OptimizationRequest
 from factorio_optimizer.compiler.simple_compiler import compile_optimization_request
+from factorio_optimizer.compiler.smelting_block_compiler import (
+    SmeltingBlockRequest,
+    compile_smelting_block,
+)
 from factorio_optimizer.config.generation_config import GenerationConfig
 from factorio_optimizer.data.items import get_optimizable_items
 from factorio_optimizer.data.modules import MODULES, ModuleConfig, get_module
@@ -69,6 +73,7 @@ def api_optimize():
     compare_furnace_modes = bool(data.get("compare_furnace_modes", False))
     belt_name = data.get("belt_name") or None
     inserter_name = data.get("inserter_name") or None
+    logistics_strategy = data.get("logistics_strategy") or "central_smelting"
 
     if unit == "per_minute":
         rate_ps = rate / 60.0
@@ -109,6 +114,7 @@ def api_optimize():
                 compare_furnace_modes=compare_furnace_modes,
                 belt_name=belt_name,
                 inserter_name=inserter_name,
+                logistics_strategy=logistics_strategy,
                 config=GenerationConfig(seed=seed, era=era, power_mode=power_mode),
             )
         )
@@ -119,7 +125,6 @@ def api_optimize():
     plans = report_dict["plans"]
 
     return jsonify({
-        # Legacy response fields kept for the current frontend.
         "item": item,
         "rate": rate,
         "unit": unit,
@@ -129,11 +134,10 @@ def api_optimize():
         "compare_furnace_modes": compare_furnace_modes,
         "belt_name": belt_name,
         "inserter_name": inserter_name,
+        "logistics_strategy": logistics_strategy,
         "furnace_mode": furnace_mode,
         "furnace_mode_note": furnace_mode_note,
         "plans": plans[:5],
-
-        # New stable response fields for the refactored UI/backend contract.
         "report": report_dict,
         "best_plan": report_dict["best_plan"],
         "summary": report_dict["summary"],
@@ -160,6 +164,45 @@ def api_generate_module_blueprint():
                 era=era,
                 machine_name=machine_name,
                 seed=seed,
+            )
+        )
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify(report.to_dict())
+
+
+@app.route("/api/generate-smelting-block", methods=["POST"])
+def api_generate_smelting_block():
+    data = request.get_json(force=True, silent=True) or {}
+
+    recipe_name = data.get("recipe_name") or data.get("item")
+    if not recipe_name:
+        return jsonify({"error": "Missing recipe_name or item."}), 400
+
+    rate = float(data.get("rate", data.get("target_rate", 30.0)))
+    unit = data.get("unit", "per_minute")
+    if unit == "per_minute":
+        rate_ps = rate / 60.0
+    elif unit == "per_hour":
+        rate_ps = rate / 3600.0
+    else:
+        rate_ps = rate
+
+    machine_name = data.get("machine_name") or "stone_furnace"
+    belt_name = data.get("belt_name") or "transport_belt"
+    inserter_name = data.get("inserter_name") or "inserter"
+    max_furnaces_per_row = int(data.get("max_furnaces_per_row", 12))
+
+    try:
+        report = compile_smelting_block(
+            SmeltingBlockRequest(
+                recipe_name=recipe_name,
+                target_rate_per_second=rate_ps,
+                machine_name=machine_name,
+                belt_name=belt_name,
+                inserter_name=inserter_name,
+                max_furnaces_per_row=max_furnaces_per_row,
             )
         )
     except Exception as exc:
