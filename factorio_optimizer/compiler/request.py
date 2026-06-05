@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Literal
 
 from factorio_optimizer.config.generation_config import Era, GenerationConfig, PowerMode
 from factorio_optimizer.data.modules import ModuleConfig
+
+
+LogisticsStrategy = Literal["central_smelting", "local_smelting", "outpost_smelting"]
 
 
 @dataclass(frozen=True)
@@ -17,6 +21,7 @@ class OptimizationRequest:
     compare_furnace_modes: bool = False
     belt_name: str | None = None
     inserter_name: str | None = None
+    logistics_strategy: LogisticsStrategy = "central_smelting"
     config: GenerationConfig = field(default_factory=GenerationConfig)
 
     @property
