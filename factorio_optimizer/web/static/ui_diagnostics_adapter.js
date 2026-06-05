@@ -5,7 +5,7 @@
   upstream scaling requirements. This renderer makes that visible in the UI:
   upstream gears/cables/plates are shown as "scale production", not as hard
   bottlenecks. It also renders transport/inserter capacity diagnostics and
-  adds belt/inserter selector controls.
+  adds logistics/transport selector controls.
 */
 
 function renderBottleneckDiagnostics(best, normalized) {
@@ -214,6 +214,7 @@ function recommendationForDiagnostic(kind) {
 function injectTransportTechSelectors() {
   if (document.getElementById('transport-tech-section')) return;
 
+  state.logisticsStrategy = state.logisticsStrategy || 'central_smelting';
   state.beltName = state.beltName || defaultBeltForEra(state.machineEra);
   state.inserterName = state.inserterName || defaultInserterForEra(state.machineEra);
 
@@ -224,6 +225,16 @@ function injectTransportTechSelectors() {
   section.className = 'config-section';
   section.id = 'transport-tech-section';
   section.innerHTML = `
+    <label class="config-label">🧭 Logistics Strategy
+      <span class="label-note">Controls report grouping first, blueprint modules later</span>
+    </label>
+    <div class="rate-row" style="margin-bottom:8px">
+      <select id="logistics-strategy-select" class="rate-unit-select" style="width:100%" onchange="setLogisticsStrategy(this.value)">
+        <option value="central_smelting">Central Smelting · default</option>
+        <option value="local_smelting">Local Smelting</option>
+        <option value="outpost_smelting">Outpost Smelting</option>
+      </select>
+    </div>
     <label class="config-label">🚚 Transport Tech
       <span class="label-note">Used for belt / inserter diagnostics</span>
     </label>
@@ -247,6 +258,10 @@ function injectTransportTechSelectors() {
   syncTransportTechSelectorsToState();
 }
 
+function setLogisticsStrategy(value) {
+  state.logisticsStrategy = value;
+}
+
 function setBeltTech(value) {
   state.beltName = value;
 }
@@ -256,8 +271,10 @@ function setInserterTech(value) {
 }
 
 function syncTransportTechSelectorsToState() {
+  const strategy = document.getElementById('logistics-strategy-select');
   const belt = document.getElementById('belt-tech-select');
   const inserter = document.getElementById('inserter-tech-select');
+  if (strategy) strategy.value = state.logisticsStrategy || 'central_smelting';
   if (belt) belt.value = state.beltName || defaultBeltForEra(state.machineEra);
   if (inserter) inserter.value = state.inserterName || defaultInserterForEra(state.machineEra);
 }
@@ -315,6 +332,7 @@ function entityDisplayName(name) {
       use_electric_furnace: state.useElectricFurnace,
       belt_name: state.beltName || defaultBeltForEra(state.machineEra),
       inserter_name: state.inserterName || defaultInserterForEra(state.machineEra),
+      logistics_strategy: state.logisticsStrategy || 'central_smelting',
       modules: getModuleConfigs(),
     };
 
@@ -356,6 +374,5 @@ function entityDisplayName(name) {
     };
   }
 
-  // Keep a reference for debugging in DevTools if needed.
   window.originalRunOptimizeWithoutTransportSelectors = originalRunOptimize;
 })();
