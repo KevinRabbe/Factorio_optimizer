@@ -39,6 +39,11 @@ def plan_scaled_early_science(request: ScaledEarlyScienceRequest) -> FactoryBlue
     block_count = ceil(request.target_rate_per_second / block.summary["capacity_per_second"])
     total_capacity_per_second = block_count * block.summary["capacity_per_second"]
     total_build_list = _multiply_counts(block.build_list, block_count)
+    total_machine_count = sum(
+        count
+        for key, count in total_build_list.items()
+        if "assembling_machine" in key or key == "labs"
+    )
     external_inputs = _multiply_rates(block.diagnostics.get("external_inputs", {}), block_count)
     belt_capacity = float(block.diagnostics.get("belt_capacity_per_second", 15.0))
     input_lanes = {
@@ -49,10 +54,18 @@ def plan_scaled_early_science(request: ScaledEarlyScienceRequest) -> FactoryBlue
         }
         for item, rate in external_inputs.items()
     }
+    external_input_lanes = {
+        item: [
+            {
+                "pattern": f"{lane['minimum_belts']} belt lane(s) feeding {item.replace('_', ' ')} across {block_count} repeated blocks",
+            }
+        ]
+        for item, lane in input_lanes.items()
+    }
     sections = [
         {
             "name": f"Early Science Slice #{index + 1}",
-            "blueprint": "repeat representative blueprint",
+            "blueprint": "repeat representative early science blueprint",
             "target_per_minute": round(request.block_rate_per_second * 60.0, 4),
             "outputs": {
                 "automation_science_pack": round(request.block_rate_per_second * 60.0, 4),
@@ -71,6 +84,7 @@ def plan_scaled_early_science(request: ScaledEarlyScienceRequest) -> FactoryBlue
         "repeatable_blocks": block_count,
         "external_inputs": external_inputs,
         "input_lanes": input_lanes,
+        "external_input_lanes": external_input_lanes,
         "train_readiness": _train_readiness(input_lanes),
         "sections": sections,
         "warnings": _warnings(request, total_capacity_per_second, block_count),
@@ -81,7 +95,7 @@ def plan_scaled_early_science(request: ScaledEarlyScienceRequest) -> FactoryBlue
         "target_rate_per_minute": round(request.target_rate_per_second * 60.0, 4),
         "capacity_per_second": round(total_capacity_per_second, 6),
         "capacity_per_minute": round(total_capacity_per_second * 60.0, 4),
-        "machine_count": total_build_list.get("assembling_machine_2s", 0),
+        "machine_count": total_machine_count,
         "block_count": block_count,
         "block_rate_per_minute": round(request.block_rate_per_second * 60.0, 4),
     }

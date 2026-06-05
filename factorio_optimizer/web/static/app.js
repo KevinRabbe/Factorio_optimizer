@@ -358,6 +358,22 @@ async function runSelectedMidBlock() {
   });
 }
 
+async function runScaledEarlySciencePlanner() {
+  const rate = parseFloat(document.getElementById('rate-input').value) || 300;
+  const unit = document.getElementById('rate-unit').value;
+  const targetPerMinute = unit === 'per_second' ? rate * 60 : rate;
+  const blockRate = targetPerMinute >= 120 ? 30 : 15;
+
+  await runMilestoneGenerator(
+    '/api/generate-scaled-early-science-plan',
+    `Scaled Early Science Plan (${targetPerMinute.toFixed(0)}/min)`,
+    {
+      block_rate: blockRate,
+      block_unit: 'per_minute',
+    },
+  );
+}
+
 async function runMilestoneGenerator(endpoint, label, extraBody = {}) {
   const rate = parseFloat(document.getElementById('rate-input').value) || 30;
   const unit = document.getElementById('rate-unit').value;
@@ -406,12 +422,12 @@ function renderBlueprintReport(label, data) {
       <div class="sc-label">Blueprint Confidence</div>
     </div>
     <div class="summary-card card-blue">
-      <div class="sc-icon">/m</div>
-      <div class="sc-value">${(summary.capacity_per_minute || 0).toFixed(1)}</div>
-      <div class="sc-label">Capacity / min</div>
+      <div class="sc-icon">CAP</div>
+      <div class="sc-value">${(summary.capacity_per_minute || 0).toFixed(1)}/min</div>
+      <div class="sc-label">Capacity</div>
     </div>
     <div class="summary-card card-amber">
-      <div class="sc-icon">M</div>
+      <div class="sc-icon">ASM</div>
       <div class="sc-value">${summary.machine_count || 0}</div>
       <div class="sc-label">Machines</div>
     </div>`;
@@ -428,6 +444,14 @@ function renderBlueprintReport(label, data) {
         <span class="energy-row-val">${warnings.length ? warnings.join('; ') : 'none'}</span>
       </div>
       <button class="save-layout-btn" onclick="copyBlueprintString()">Copy Blueprint String</button>
+      <span id="blueprint-copy-status" class="blueprint-copy-status">Ready to copy</span>
+      <textarea
+        id="blueprint-string-output"
+        class="blueprint-string-output"
+        readonly
+        spellcheck="false"
+        onclick="this.select()"
+      >${escapeHtml(data.blueprint_string || '')}</textarea>
       ${buildSummaryHtml}
       ${laneGuideHtml}
       <pre class="ascii-preview">${escapeHtml(data.ascii || '')}</pre>
@@ -524,10 +548,28 @@ function formatItemName(item) {
 }
 
 async function copyBlueprintString() {
-  const blueprint = state.lastResult?.blueprint_string;
-  if (!blueprint) return;
-  await navigator.clipboard.writeText(blueprint);
-  showToast();
+  const box = document.getElementById('blueprint-string-output');
+  const status = document.getElementById('blueprint-copy-status');
+  const blueprint = state.lastResult?.blueprint_string || box?.value || '';
+
+  if (!blueprint) {
+    if (status) status.textContent = 'No blueprint string available.';
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(blueprint);
+    if (status) status.textContent = 'Copied.';
+    showToast();
+  } catch (_err) {
+    if (box) {
+      box.focus();
+      box.select();
+      if (status) status.textContent = 'Clipboard blocked. Press Ctrl+C now.';
+      return;
+    }
+    if (status) status.textContent = 'Clipboard blocked.';
+  }
 }
 
 function escapeHtml(value) {

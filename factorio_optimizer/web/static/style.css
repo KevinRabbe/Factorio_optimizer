@@ -1159,6 +1159,35 @@ body {
   border-color: var(--amber);
 }
 
+.blueprint-copy-status {
+  display: inline-block;
+  margin-left: 8px;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.blueprint-string-output {
+  width: 100%;
+  min-height: 130px;
+  box-sizing: border-box;
+  margin: 10px 0 12px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.blueprint-string-output:focus {
+  outline: 1px solid var(--amber);
+  border-color: var(--amber);
+}
+
 .ascii-preview {
   max-height: 320px;
   overflow: auto;

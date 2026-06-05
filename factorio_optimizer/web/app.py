@@ -33,6 +33,10 @@ from factorio_optimizer.compiler.mid_tier_compiler import (
     compile_mid_block,
     compile_mid_tier_slice,
 )
+from factorio_optimizer.compiler.scaling_planner import (
+    ScaledEarlyScienceRequest,
+    plan_scaled_early_science,
+)
 from factorio_optimizer.config.generation_config import GenerationConfig
 from factorio_optimizer.data.items import get_optimizable_items, has_item
 from factorio_optimizer.data.modules import MODULES, ModuleConfig, get_module
@@ -354,6 +358,32 @@ def api_generate_mid_tier_slice():
                 transport_tier=transport_tier,
                 fluid_mode=fluid_mode,
                 strategy=strategy,
+                include_power_poles=include_power_poles,
+            )
+        )
+    except (DomainError, ValueError) as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify(report.to_dict())
+
+
+@app.route("/api/generate-scaled-early-science-plan", methods=["POST"])
+def api_generate_scaled_early_science_plan():
+    try:
+        data = _json_payload()
+        rate = _parse_positive_float(data.get("rate", data.get("target_rate", 300.0)), "rate")
+        unit = _parse_unit(data.get("unit", "per_minute"))
+        block_rate = _parse_positive_float(data.get("block_rate", 30.0), "block_rate")
+        block_unit = _parse_unit(data.get("block_unit", unit))
+        machine_tier = _parse_machine_tier(data.get("machine_tier", data.get("era", "mid")))
+        transport_tier = _parse_transport_tier(data.get("transport_tier", "mid"))
+        include_power_poles = _parse_bool(data.get("include_power_poles", True))
+        report = plan_scaled_early_science(
+            ScaledEarlyScienceRequest(
+                target_rate_per_second=_rate_per_second(rate, unit),
+                block_rate_per_second=_rate_per_second(block_rate, block_unit),
+                machine_tier=machine_tier,
+                transport_tier=transport_tier,
                 include_power_poles=include_power_poles,
             )
         )

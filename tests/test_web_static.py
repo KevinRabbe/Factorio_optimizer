@@ -19,6 +19,10 @@ def test_blueprint_report_ui_renders_lane_guides() -> None:
     assert ".lane-row" in style_css
     assert ".blueprint-build-summary" in style_css
     assert ".blueprint-build-chip" in style_css
+    assert "id=\"blueprint-string-output\"" in app_js
+    assert "Clipboard blocked. Press Ctrl+C now." in app_js
+    assert ".blueprint-string-output" in style_css
+    assert ".blueprint-copy-status" in style_css
 
 
 def test_build_list_ui_renders_collapsible_totals() -> None:
@@ -35,6 +39,8 @@ def test_build_list_ui_renders_collapsible_totals() -> None:
 
 def test_blueprint_button_routes_to_practical_generators() -> None:
     response_js = (ROOT / "factorio_optimizer" / "web" / "static" / "ui_response_adapter.js").read_text(encoding="utf-8")
+    app_js = (ROOT / "factorio_optimizer" / "web" / "static" / "app.js").read_text(encoding="utf-8")
+    index_html = (ROOT / "factorio_optimizer" / "web" / "static" / "index.html").read_text(encoding="utf-8")
 
     assert "function selectedBlueprintRequest" in response_js
     assert "renderBlueprintReport(request.label, data)" in response_js
@@ -45,3 +51,6 @@ def test_blueprint_button_routes_to_practical_generators() -> None:
     assert "'/api/generate-module-blueprint'" in response_js
     assert "'chemical_science_pack'" in response_js
     assert "'military_science_pack'" in response_js
+    assert "function runScaledEarlySciencePlanner" in app_js
+    assert "/api/generate-scaled-early-science-plan" in app_js
+    assert "Plan Scaled Red + Green" in index_html
