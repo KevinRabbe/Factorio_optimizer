@@ -1352,6 +1352,11 @@ body {
   font-family: 'JetBrains Mono', monospace;
 }
 
+.blueprint-build-chip-active {
+  border-color: var(--amber);
+  background: var(--amber-glow);
+}
+
 .lane-guide {
   margin: 14px 0;
   padding: 12px;

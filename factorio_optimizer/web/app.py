@@ -375,15 +375,16 @@ def api_generate_scaled_early_science_plan():
         data = _json_payload()
         rate = _parse_positive_float(data.get("rate", data.get("target_rate", 300.0)), "rate")
         unit = _parse_unit(data.get("unit", "per_minute"))
-        block_rate = _parse_positive_float(data.get("block_rate", 30.0), "block_rate")
-        block_unit = _parse_unit(data.get("block_unit", unit))
+        raw_block_rate = data.get("block_rate")
+        block_rate = _parse_positive_float(raw_block_rate, "block_rate") if raw_block_rate is not None else None
+        block_unit = _parse_unit(data.get("block_unit", unit)) if raw_block_rate is not None else unit
         machine_tier = _parse_machine_tier(data.get("machine_tier", data.get("era", "mid")))
         transport_tier = _parse_transport_tier(data.get("transport_tier", "mid"))
         include_power_poles = _parse_bool(data.get("include_power_poles", True))
         report = plan_scaled_early_science(
             ScaledEarlyScienceRequest(
                 target_rate_per_second=_rate_per_second(rate, unit),
-                block_rate_per_second=_rate_per_second(block_rate, block_unit),
+                block_rate_per_second=_rate_per_second(block_rate, block_unit) if block_rate is not None else None,
                 machine_tier=machine_tier,
                 transport_tier=transport_tier,
                 include_power_poles=include_power_poles,
@@ -401,14 +402,15 @@ def api_generate_scaled_green_circuit_plan():
         data = _json_payload()
         rate = _parse_positive_float(data.get("rate", data.get("target_rate", 300.0)), "rate")
         unit = _parse_unit(data.get("unit", "per_minute"))
-        block_rate = _parse_positive_float(data.get("block_rate", 60.0), "block_rate")
-        block_unit = _parse_unit(data.get("block_unit", unit))
+        raw_block_rate = data.get("block_rate")
+        block_rate = _parse_positive_float(raw_block_rate, "block_rate") if raw_block_rate is not None else None
+        block_unit = _parse_unit(data.get("block_unit", unit)) if raw_block_rate is not None else unit
         era = _parse_era(data.get("era", "mid"))
         include_power_poles = _parse_bool(data.get("include_power_poles", True))
         report = plan_scaled_green_circuits(
             ScaledGreenCircuitRequest(
                 target_rate_per_second=_rate_per_second(rate, unit),
-                block_rate_per_second=_rate_per_second(block_rate, block_unit),
+                block_rate_per_second=_rate_per_second(block_rate, block_unit) if block_rate is not None else None,
                 era=era,
                 include_power_poles=include_power_poles,
             )

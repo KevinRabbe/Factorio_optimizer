@@ -89,18 +89,20 @@ def test_blueprint_generation_endpoints() -> None:
     scaled = _assert_ok(
         client.post(
             "/api/generate-scaled-early-science-plan",
-            json={"rate": 300, "unit": "per_minute", "block_rate": 30, "block_unit": "per_minute"},
+            json={"rate": 300, "unit": "per_minute"},
         ),
         "/api/generate-scaled-early-science-plan",
     )
     assert scaled["valid"] is True
-    assert scaled["summary"]["block_count"] == 10
+    assert scaled["summary"]["block_count"] == 5
+    assert scaled["diagnostics"]["selection_mode"] == "auto"
+    assert scaled["diagnostics"]["selected_block_rate_per_minute"] == 60.0
     assert scaled["diagnostics"]["planner_mode"] == "scaled_repeatable_early_science"
 
     scaled_green = _assert_ok(
         client.post(
             "/api/generate-scaled-green-circuit-plan",
-            json={"rate": 300, "unit": "per_minute", "block_rate": 60, "block_unit": "per_minute"},
+            json={"rate": 300, "unit": "per_minute"},
         ),
         "/api/generate-scaled-green-circuit-plan",
     )
@@ -108,6 +110,7 @@ def test_blueprint_generation_endpoints() -> None:
     assert scaled_green["summary"]["block_count"] == 4
     assert scaled_green["summary"]["capacity_per_minute"] == 360.0
     assert scaled_green["summary"]["block_rate_per_minute"] == 90.0
+    assert scaled_green["diagnostics"]["selection_mode"] == "auto"
     assert scaled_green["diagnostics"]["planner_mode"] == "scaled_repeatable_green_circuits"
 
 

@@ -362,15 +362,11 @@ async function runScaledEarlySciencePlanner() {
   const rate = parseFloat(document.getElementById('rate-input').value) || 300;
   const unit = document.getElementById('rate-unit').value;
   const targetPerMinute = unit === 'per_second' ? rate * 60 : rate;
-  const blockRate = targetPerMinute >= 120 ? 30 : 15;
 
   await runMilestoneGenerator(
     '/api/generate-scaled-early-science-plan',
     `Scaled Early Science Plan (${targetPerMinute.toFixed(0)}/min)`,
-    {
-      block_rate: blockRate,
-      block_unit: 'per_minute',
-    },
+    {},
   );
 }
 
@@ -378,14 +374,11 @@ async function runScaledGreenCircuitPlanner() {
   const rate = parseFloat(document.getElementById('rate-input').value) || 300;
   const unit = document.getElementById('rate-unit').value;
   const targetPerMinute = unit === 'per_second' ? rate * 60 : rate;
-  const blockRate = targetPerMinute >= 240 ? 60 : 30;
 
   await runMilestoneGenerator(
     '/api/generate-scaled-green-circuit-plan',
     `Scaled Green Circuit Plan (${targetPerMinute.toFixed(0)}/min)`,
     {
-      block_rate: blockRate,
-      block_unit: 'per_minute',
       era: state.machineEra === 'early' ? 'early' : 'mid',
     },
   );
@@ -487,8 +480,11 @@ function renderScaledPlanGuide(summary, diagnostics) {
   if (!sections.length) return '';
 
   const trainReadiness = diagnostics.train_readiness || {};
+  const candidateOptions = Array.isArray(diagnostics.candidate_options) ? diagnostics.candidate_options : [];
   const blockCount = summary.block_count || sections.length;
   const blockRate = summary.block_rate_per_minute || sections[0]?.target_per_minute || 0;
+  const selectionMode = diagnostics.selection_mode === 'auto' ? 'Auto-selected' : 'Fixed block size';
+  const selectedRate = Number(diagnostics.selected_block_rate_per_minute || blockRate).toFixed(1);
   const sectionRows = sections.map((section, index) => `
     <div class="scaled-plan-row">
       <div>
@@ -519,6 +515,8 @@ function renderScaledPlanGuide(summary, diagnostics) {
         <div class="scaled-plan-intro">
           Use the blueprint string above as the representative block. Paste it ${blockCount} times in a row, keeping the same lane orientation.
         </div>
+        <div class="scaled-plan-intro">${selectionMode}: representative block resolves to ${selectedRate}/min.</div>
+        ${renderScaledCandidateChips(candidateOptions)}
         <div class="scaled-plan-section-label">Sections</div>
         ${sectionRows}
         <div class="scaled-plan-section-label">Transport Readiness</div>
@@ -526,6 +524,21 @@ function renderScaledPlanGuide(summary, diagnostics) {
         ${stationRows || '<div class="scaled-plan-empty">No train unload stations needed yet for this target.</div>'}
       </div>
     </details>`;
+}
+
+function renderScaledCandidateChips(candidateOptions) {
+  if (!candidateOptions.length) return '';
+
+  const chips = candidateOptions.map((option, index) => `
+    <span class="blueprint-build-chip ${index === 0 ? 'blueprint-build-chip-active' : ''}">
+      <span>${Number(option.actual_block_rate_per_minute || 0).toFixed(1)}/min block</span>
+      <strong>${Number(option.overbuild_per_minute || 0).toFixed(1)} over</strong>
+    </span>
+  `).join('');
+
+  return `
+    <div class="scaled-plan-section-label">Candidate Blocks</div>
+    <div class="blueprint-build-chip-row">${chips}</div>`;
 }
 
 function renderBlueprintBuildSummary(buildList) {
