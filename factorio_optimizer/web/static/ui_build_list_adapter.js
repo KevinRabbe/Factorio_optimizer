@@ -2,7 +2,7 @@
   Build list UI adapter.
 
   Loaded after diagnostics adapters. It appends dependency edge explanation and
-  a build/shopping list to the Best Plan tab.
+  a logistics-strategy-aware build/shopping list to the Best Plan tab.
 */
 
 (function installBuildListRenderer() {
@@ -42,10 +42,10 @@ function renderDependencyEdges(chainTree, normalized) {
   const rows = shown.map(edge => `
     <div class="cn-energy" style="padding-left:${Math.min(edge.depth || 0, 5) * 14}px">
       ${escapeHtml(edge.source_icon || '📦')} <strong>${escapeHtml(edge.source_display_name)}</strong>
-      <span style="opacity:0.75">from ${escapeHtml(edge.source_machine || 'source')}</span>
+      <span style="opacity:0.75">from ${escapeHtml(edgeBlockLabel(edge.source_block) || edge.source_machine || 'source')}</span>
       &nbsp;→&nbsp;
       ${escapeHtml(edge.target_icon || '⚙️')} <strong>${escapeHtml(edge.target_display_name)}</strong>
-      <span style="opacity:0.75">into ${escapeHtml(edge.target_machine || 'target')}</span>
+      <span style="opacity:0.75">into ${escapeHtml(edgeBlockLabel(edge.target_block) || edge.target_machine || 'target')}</span>
       &nbsp;·&nbsp; ${Number(edge.required_per_minute || 0).toFixed(2)}/min
     </div>
   `).join('');
@@ -67,6 +67,7 @@ function renderDependencyEdges(chainTree, normalized) {
 function renderBuildList(chainTree, normalized) {
   const buildList = normalized.diagnostics?.build_list || normalized.summary?.build_list || {};
   const items = buildList.items || [];
+  const strategy = buildList.logistics_strategy || normalized.diagnostics?.logistics_strategy || state.logisticsStrategy || 'central_smelting';
 
   const diagnostics = document.createElement('div');
   diagnostics.className = 'chain-node';
@@ -87,8 +88,37 @@ function renderBuildList(chainTree, normalized) {
   }
 
   const grouped = groupBuildListItems(items);
-  const rows = Object.entries(grouped).map(([category, categoryItems]) => `
+  const rows = Object.entries(grouped).map(([block, blockItems]) => `
     <div class="cn-energy">
+      <strong>${escapeHtml(blockLabel(block))}</strong>
+      ${renderBlockCategories(blockItems)}
+    </div>
+  `).join('');
+
+  diagnostics.innerHTML = `
+    <div class="chain-node-header">
+      <span class="cn-icon">🧾</span>
+      <div class="cn-info">
+        <div class="cn-name">Build List</div>
+        <div class="cn-machine">${escapeHtml(strategyLabel(strategy))} · approximate physical parts needed.</div>
+      </div>
+      <div class="cn-stats"><span class="cn-count">${items.length}</span><span class="cn-rate">items</span></div>
+    </div>
+    ${rows}`;
+
+  chainTree.appendChild(diagnostics);
+}
+
+function renderBlockCategories(items) {
+  const byCategory = {};
+  for (const item of items) {
+    const category = item.category || 'other';
+    if (!byCategory[category]) byCategory[category] = [];
+    byCategory[category].push(item);
+  }
+
+  return Object.entries(byCategory).map(([category, categoryItems]) => `
+    <div style="margin-top:8px; padding-left:12px">
       <strong>${escapeHtml(categoryLabel(category))}</strong>
       ${categoryItems.map(item => `
         <div style="margin-top:4px; padding-left:12px">
@@ -98,29 +128,32 @@ function renderBuildList(chainTree, normalized) {
       `).join('')}
     </div>
   `).join('');
-
-  diagnostics.innerHTML = `
-    <div class="chain-node-header">
-      <span class="cn-icon">🧾</span>
-      <div class="cn-info">
-        <div class="cn-name">Build List</div>
-        <div class="cn-machine">Approximate physical parts needed for this plan.</div>
-      </div>
-      <div class="cn-stats"><span class="cn-count">${items.length}</span><span class="cn-rate">groups</span></div>
-    </div>
-    ${rows}`;
-
-  chainTree.appendChild(diagnostics);
 }
 
 function groupBuildListItems(items) {
   const grouped = {};
   for (const item of items) {
-    const category = item.category || 'other';
-    if (!grouped[category]) grouped[category] = [];
-    grouped[category].push(item);
+    const block = item.logistics_block || 'local_crafting_block';
+    if (!grouped[block]) grouped[block] = [];
+    grouped[block].push(item);
   }
   return grouped;
+}
+
+function blockLabel(block) {
+  const labels = {
+    central_smelting_block: '🔥 Central Smelting Block',
+    local_crafting_block: '🏭 Local Crafting Block',
+    outpost_smelting_block: '🚂 Outpost Smelting Block',
+    local_production_block: '📍 Local Production Block',
+    power_block: '⚡ Power Block',
+  };
+  return labels[block] || block;
+}
+
+function edgeBlockLabel(block) {
+  if (!block) return '';
+  return blockLabel(block);
 }
 
 function categoryLabel(category) {
@@ -132,4 +165,13 @@ function categoryLabel(category) {
     other: '📦 Other',
   };
   return labels[category] || category;
+}
+
+function strategyLabel(strategy) {
+  const labels = {
+    central_smelting: 'Central Smelting strategy',
+    local_smelting: 'Local Smelting strategy',
+    outpost_smelting: 'Outpost Smelting strategy',
+  };
+  return labels[strategy] || strategy;
 }
