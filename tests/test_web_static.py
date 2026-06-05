@@ -11,12 +11,16 @@ def test_blueprint_report_ui_renders_lane_guides() -> None:
     style_css = (ROOT / "factorio_optimizer" / "web" / "static" / "style.css").read_text(encoding="utf-8")
 
     assert "function renderLaneGuide" in app_js
+    assert "function renderScaledPlanGuide" in app_js
     assert "function renderBlueprintBuildSummary" in app_js
     assert "external_input_lanes" in app_js
     assert "output_lanes" in app_js
+    assert "Repeatable Paste Plan" in app_js
     assert "blueprint-build-chip" in app_js
     assert ".lane-guide" in style_css
     assert ".lane-row" in style_css
+    assert ".scaled-plan-guide" in style_css
+    assert ".scaled-plan-row" in style_css
     assert ".blueprint-build-summary" in style_css
     assert ".blueprint-build-chip" in style_css
     assert "id=\"blueprint-string-output\"" in app_js

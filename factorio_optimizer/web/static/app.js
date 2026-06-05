@@ -414,6 +414,8 @@ function renderBlueprintReport(label, data) {
   const externalInputs = Object.keys(diagnostics.external_inputs || {});
   const laneGuideHtml = renderLaneGuide(diagnostics);
   const buildSummaryHtml = renderBlueprintBuildSummary(data.build_list || {});
+  const scaledPlanHtml = renderScaledPlanGuide(summary, diagnostics);
+  const machineLabel = typeof summary.block_count === 'number' ? 'Assemblers / Labs' : 'Machines';
 
   document.getElementById('summary-cards').innerHTML = `
     <div class="summary-card ${data.valid ? 'card-green' : 'card-purple'}">
@@ -429,7 +431,7 @@ function renderBlueprintReport(label, data) {
     <div class="summary-card card-amber">
       <div class="sc-icon">ASM</div>
       <div class="sc-value">${summary.machine_count || 0}</div>
-      <div class="sc-label">Machines</div>
+      <div class="sc-label">${machineLabel}</div>
     </div>`;
 
   document.getElementById('chain-tree').innerHTML = `
@@ -453,6 +455,7 @@ function renderBlueprintReport(label, data) {
         onclick="this.select()"
       >${escapeHtml(data.blueprint_string || '')}</textarea>
       ${buildSummaryHtml}
+      ${scaledPlanHtml}
       ${laneGuideHtml}
       <pre class="ascii-preview">${escapeHtml(data.ascii || '')}</pre>
     </div>`;
@@ -460,6 +463,52 @@ function renderBlueprintReport(label, data) {
   document.getElementById('energy-view').innerHTML = `<pre class="ascii-preview">${escapeHtml(JSON.stringify(data.validation_confidence || {}, null, 2))}</pre>`;
   document.getElementById('raw-inputs-view').innerHTML = laneGuideHtml || `<pre class="ascii-preview">${escapeHtml(JSON.stringify(diagnostics.external_inputs || {}, null, 2))}</pre>`;
   showResultTab('best');
+}
+
+function renderScaledPlanGuide(summary, diagnostics) {
+  const sections = Array.isArray(diagnostics.sections) ? diagnostics.sections : [];
+  if (!sections.length) return '';
+
+  const trainReadiness = diagnostics.train_readiness || {};
+  const blockCount = summary.block_count || sections.length;
+  const blockRate = summary.block_rate_per_minute || sections[0]?.target_per_minute || 0;
+  const sectionRows = sections.map((section, index) => `
+    <div class="scaled-plan-row">
+      <div>
+        <div class="scaled-plan-item">${escapeHtml(section.name || `Section ${index + 1}`)}</div>
+        <div class="scaled-plan-note">Paste the representative blueprint once here. Target ${Number(section.target_per_minute || 0).toFixed(1)}/min.</div>
+      </div>
+      <span class="scaled-plan-rate">#${index + 1}</span>
+    </div>
+  `).join('');
+
+  const stationRows = (trainReadiness.station_blocks || []).map((station) => `
+    <div class="scaled-plan-row scaled-plan-row-station">
+      <div>
+        <div class="scaled-plan-item">${escapeHtml(formatItemName(station.item))} unload</div>
+        <div class="scaled-plan-note">${escapeHtml(station.notes || '')}</div>
+      </div>
+      <span class="scaled-plan-rate">${escapeHtml(String(station.minimum_output_belts || 1))} belt(s)</span>
+    </div>
+  `).join('');
+
+  return `
+    <details class="scaled-plan-guide" open>
+      <summary>
+        <span>Repeatable Paste Plan</span>
+        <span class="build-summary-meta">${blockCount} blocks at ${Number(blockRate).toFixed(1)}/min each</span>
+      </summary>
+      <div class="scaled-plan-body">
+        <div class="scaled-plan-intro">
+          Use the blueprint string above as the representative block. Paste it ${blockCount} times in a row, keeping the same lane orientation.
+        </div>
+        <div class="scaled-plan-section-label">Sections</div>
+        ${sectionRows}
+        <div class="scaled-plan-section-label">Transport Readiness</div>
+        <div class="scaled-plan-intro">${escapeHtml(trainReadiness.reason || 'Belts are sufficient for this target rate.')}</div>
+        ${stationRows || '<div class="scaled-plan-empty">No train unload stations needed yet for this target.</div>'}
+      </div>
+    </details>`;
 }
 
 function renderBlueprintBuildSummary(buildList) {
