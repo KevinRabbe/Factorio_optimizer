@@ -39,6 +39,18 @@ from factorio_optimizer.compiler.scaling_planner import (
     plan_scaled_early_science,
     plan_scaled_green_circuits,
 )
+from factorio_optimizer.compiler.starter_mall_compiler import (
+    StarterMallRequest,
+    compile_starter_mall,
+)
+from factorio_optimizer.compiler.starter_mining_compiler import (
+    StarterMiningRequest,
+    compile_starter_mining_block,
+)
+from factorio_optimizer.compiler.starter_smelting_compiler import (
+    StarterSmeltingRequest,
+    compile_starter_smelting_block,
+)
 from factorio_optimizer.config.generation_config import GenerationConfig
 from factorio_optimizer.data.items import get_optimizable_items, has_item
 from factorio_optimizer.data.modules import MODULES, ModuleConfig, get_module
@@ -421,6 +433,114 @@ def api_generate_scaled_green_circuit_plan():
     return jsonify(report.to_dict())
 
 
+@app.route("/api/generate-starter-mall", methods=["POST"])
+def api_generate_starter_mall():
+    try:
+        data = _json_payload()
+        include_power_poles = _parse_bool(data.get("include_power_poles", True))
+        report = compile_starter_mall(
+            StarterMallRequest(
+                include_power_poles=include_power_poles,
+            )
+        )
+    except (DomainError, ValueError) as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify(report.to_dict())
+
+
+@app.route("/api/generate-mining-upgrade-block", methods=["POST"])
+def api_generate_mining_upgrade_block():
+    try:
+        data = _json_payload()
+        item = _parse_mining_item(data.get("item", "iron_ore"))
+        miner_name = _parse_miner_name(data.get("miner_name", "electric_mining_drill"))
+        belt_name = data.get("belt_name") or "transport_belt"
+        include_power_poles = _parse_bool(data.get("include_power_poles", True))
+        size_mode = _parse_starter_mining_size_mode(data.get("size_mode", "full_yellow_30"))
+        report = compile_starter_mining_block(
+            StarterMiningRequest(
+                item=item,
+                miner_name=miner_name,
+                belt_name=belt_name,
+                include_power_poles=include_power_poles,
+                size_mode=size_mode,
+            )
+        )
+    except (DomainError, ValueError) as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify(report.to_dict())
+
+
+@app.route("/api/generate-brick-smelting-block", methods=["POST"])
+def api_generate_brick_smelting_block():
+    try:
+        data = _json_payload()
+        rate = _parse_positive_float(data.get("rate", data.get("target_rate", 450.0)), "rate")
+        unit = _parse_unit(data.get("unit", "per_minute"))
+        machine_name = _parse_starter_furnace_machine_name(data.get("machine_name", "stone_furnace"))
+        report = compile_starter_smelting_block(
+            StarterSmeltingRequest(
+                recipe_name="stone_brick",
+                target_rate_per_second=_rate_per_second(rate, unit),
+                size_mode="brick_24",
+                machine_name=machine_name,
+            )
+        )
+    except (DomainError, ValueError) as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify(report.to_dict())
+
+
+@app.route("/api/generate-starter-steel-block", methods=["POST"])
+def api_generate_starter_steel_block():
+    try:
+        data = _json_payload()
+        rate = _parse_positive_float(data.get("rate", data.get("target_rate", 45.0)), "rate")
+        unit = _parse_unit(data.get("unit", "per_minute"))
+        machine_name = _parse_starter_furnace_machine_name(data.get("machine_name", "stone_furnace"))
+        report = compile_starter_smelting_block(
+            StarterSmeltingRequest(
+                recipe_name="steel_plate",
+                target_rate_per_second=_rate_per_second(rate, unit),
+                size_mode="starter_12",
+                machine_name=machine_name,
+            )
+        )
+    except (DomainError, ValueError) as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify(report.to_dict())
+
+
+@app.route("/api/generate-smelting-upgrade-block", methods=["POST"])
+def api_generate_smelting_upgrade_block():
+    try:
+        data = _json_payload()
+        raw_recipe = data.get("recipe_name") or data.get("item") or "iron_plate"
+        recipe_name = _parse_mainline_smelting_recipe(raw_recipe)
+        rate = _parse_positive_float(data.get("rate", data.get("target_rate", 30.0)), "rate")
+        unit = _parse_unit(data.get("unit", "per_minute"))
+        size_mode = _parse_starter_smelting_size_mode(data.get("size_mode", "full_belt_48"))
+        machine_name = _parse_starter_furnace_machine_name(data.get("machine_name", "stone_furnace"))
+        max_furnaces_per_row = _parse_int(data.get("max_furnaces_per_row", 8), "max_furnaces_per_row")
+        report = compile_starter_smelting_block(
+            StarterSmeltingRequest(
+                recipe_name=recipe_name,
+                target_rate_per_second=_rate_per_second(rate, unit),
+                size_mode=size_mode,
+                machine_name=machine_name,
+                max_furnaces_per_row=max_furnaces_per_row,
+            )
+        )
+    except (DomainError, ValueError) as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify(report.to_dict())
+
+
 def _furnace_mode_label(era: str, use_electric_furnace: bool, compare_furnace_modes: bool) -> str:
     if era == "early":
         return "burner_only"
@@ -521,6 +641,47 @@ def _parse_mid_strategy(value: object) -> str:
     allowed = {"readable", "compact", "external_fluids", "external_plates", "include_smelting"}
     if value not in allowed:
         raise InputError("strategy must be one of: readable, compact, external_fluids, external_plates, include_smelting.")
+    return str(value)
+
+
+def _parse_starter_smelting_size_mode(value: object) -> str:
+    allowed = {"starter_12", "compact_16", "brick_24", "standard_32", "full_belt_48"}
+    if value not in allowed:
+        raise InputError("size_mode must be one of: starter_12, compact_16, brick_24, standard_32, full_belt_48.")
+    return str(value)
+
+
+def _parse_starter_mining_size_mode(value: object) -> str:
+    allowed = {"bootstrap_12", "half_yellow_15", "full_yellow_30"}
+    if value not in allowed:
+        raise InputError("size_mode must be one of: bootstrap_12, half_yellow_15, full_yellow_30.")
+    return str(value)
+
+
+def _parse_mining_item(item: object) -> str:
+    allowed = {"iron_ore", "copper_ore", "coal"}
+    if not isinstance(item, str) or item not in allowed:
+        raise InputError("item must be one of: iron_ore, copper_ore, coal.")
+    return item
+
+
+def _parse_miner_name(value: object) -> str:
+    allowed = {"burner_mining_drill", "electric_mining_drill"}
+    if value not in allowed:
+        raise InputError("miner_name must be one of: burner_mining_drill, electric_mining_drill.")
+    return str(value)
+
+
+def _parse_mainline_smelting_recipe(value: object) -> str:
+    if value not in {"iron_plate", "copper_plate"}:
+        raise InputError("recipe_name must be one of: iron_plate, copper_plate.")
+    return str(value)
+
+
+def _parse_starter_furnace_machine_name(value: object) -> str:
+    allowed = {"stone_furnace", "steel_furnace"}
+    if value not in allowed:
+        raise InputError("machine_name must be one of: stone_furnace, steel_furnace.")
     return str(value)
 
 

@@ -55,6 +55,7 @@ ITEMS: dict[str, ItemMeta] = {
     "electronic_circuit": ItemMeta("electronic_circuit", "Electronic Circuit", "early", "intermediate", "🟢"),
     "iron_stick":     ItemMeta("iron_stick",      "Iron Stick",     "early", "intermediate", "📏"),
     "pipe":           ItemMeta("pipe",            "Pipe",           "early", "logistics",    "🔧"),
+    "pipe_to_ground": ItemMeta("pipe_to_ground",  "Pipe To Ground", "early", "logistics",    "↕️"),
 
     # ── Early game logistics / equipment ─────────────────────────────────
     "transport_belt": ItemMeta("transport_belt",  "Transport Belt", "early", "logistics",    "🟡"),
@@ -71,6 +72,9 @@ ITEMS: dict[str, ItemMeta] = {
     "assembling_machine_1": ItemMeta("assembling_machine_1", "Assembling Machine 1", "early", "intermediate", "🏭"),
     "electric_mining_drill": ItemMeta("electric_mining_drill", "Electric Mining Drill", "early", "intermediate", "⛏️"),
     "lab":            ItemMeta("lab",             "Lab",            "early", "intermediate", "🔬"),
+    "stone_furnace":  ItemMeta("stone_furnace",   "Stone Furnace",  "early", "intermediate", "🔥"),
+    "boiler":         ItemMeta("boiler",          "Boiler",         "early", "intermediate", "♨️"),
+    "steam_engine":   ItemMeta("steam_engine",    "Steam Engine",   "early", "intermediate", "⚙️"),
 
     # ── Early game science ───────────────────────────────────────────────
     "automation_science_pack": ItemMeta(

@@ -67,14 +67,16 @@ class ValidationConfidence:
 
 
 _INTERFACE_TYPES = {"input_interface", "output_interface"}
-_PHYSICAL_TYPES = {"assembler", "belt", "furnace", "inserter", "splitter", "pipe", "chemical_plant", "refinery", "lab"}
-_PRODUCER_TYPES = {"assembler", "furnace", "chemical_plant", "refinery"}
+_PHYSICAL_TYPES = {"assembler", "belt", "furnace", "miner", "inserter", "splitter", "chest", "pipe", "chemical_plant", "refinery", "lab"}
+_PRODUCER_TYPES = {"assembler", "furnace", "miner", "chemical_plant", "refinery"}
 _ENTITY_NAMES = {
     "belt": "transport-belt",
     "inserter": "inserter",
     "assembler": "assembling-machine-1",
     "furnace": "stone-furnace",
+    "miner": "electric-mining-drill",
     "splitter": "splitter",
+    "chest": "iron-chest",
     "electric_pole": "small-electric-pole",
     "pipe": "pipe",
     "chemical_plant": "chemical-plant",
@@ -254,7 +256,7 @@ def _validate_belt_continuity(plan: BlueprintPlan, result: ValidationResult) -> 
         next_position = Position(belt.position.x + dx, belt.position.y + dy)
         if _has_same_item_belt_at(belts, next_position, belt.item):
             continue
-        if _has_physical_object_at(plan.objects, next_position, allowed_types={"inserter", "splitter", "assembler", "furnace", "chemical_plant", "refinery", "lab"}):
+        if _has_physical_object_at(plan.objects, next_position, allowed_types={"inserter", "splitter", "chest", "assembler", "furnace", "chemical_plant", "refinery", "lab"}):
             continue
         if _is_at_plan_edge(belt.position, belt.direction, plan):
             continue

@@ -29,6 +29,9 @@ def _symbol_for_object(object_type: str, role: str | None) -> str:
     if object_type == "furnace":
         return "F"
 
+    if object_type == "miner":
+        return "M"
+
     if object_type == "inserter":
         if role == "ingredient_transfer":
             return "i"
@@ -41,6 +44,9 @@ def _symbol_for_object(object_type: str, role: str | None) -> str:
 
     if object_type == "splitter":
         return "S"
+
+    if object_type == "chest":
+        return "H"
 
     if object_type == "electric_pole":
         return "P"

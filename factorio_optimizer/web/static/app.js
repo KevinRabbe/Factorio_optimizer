@@ -384,6 +384,52 @@ async function runScaledGreenCircuitPlanner() {
   );
 }
 
+async function runStarterMiningGenerator() {
+  const selectedName = state.selectedItem?.name;
+  const itemName = selectedName === 'copper_ore' || selectedName === 'copper_plate'
+    ? 'copper_ore'
+    : selectedName === 'coal'
+      ? 'coal'
+      : 'iron_ore';
+  const itemLabel = itemName.replace(/_/g, ' ');
+  const label = `Mining Chunk â€” Electric Drills (${itemLabel})`;
+
+  await runMilestoneGenerator(
+    '/api/generate-mining-upgrade-block',
+    label,
+    {
+      item: itemName,
+      miner_name: 'electric_mining_drill',
+      size_mode: 'standard_12',
+      include_power_poles: true,
+    },
+  );
+}
+
+async function runStarterMallGenerator() {
+  await runMilestoneGenerator(
+    '/api/generate-starter-mall',
+    'Starter Mall — Feed from Smelting',
+    {},
+  );
+}
+
+async function runStarterSmeltingGenerator() {
+  const smeltingRecipes = new Set(['iron_plate', 'copper_plate', 'steel_plate', 'stone_brick']);
+  const recipeName = smeltingRecipes.has(state.selectedItem?.name) ? state.selectedItem.name : 'iron_plate';
+  const itemLabel = recipeName.replace(/_/g, ' ');
+  const label = `Coal Smelting Block — 48 Furnaces (${itemLabel})`;
+
+  await runMilestoneGenerator(
+    '/api/generate-smelting-upgrade-block',
+    label,
+    {
+      recipe_name: recipeName,
+      size_mode: 'full_belt_48',
+    },
+  );
+}
+
 async function runMilestoneGenerator(endpoint, label, extraBody = {}) {
   const rate = parseFloat(document.getElementById('rate-input').value) || 30;
   const unit = document.getElementById('rate-unit').value;
@@ -422,10 +468,17 @@ function renderBlueprintReport(label, data) {
   const diagnostics = data.diagnostics || {};
   const warnings = diagnostics.warnings || [];
   const externalInputs = Object.keys(diagnostics.external_inputs || {});
+  const upgradeNote = diagnostics.upgrade_note || diagnostics.build_stage_note || '';
   const laneGuideHtml = renderLaneGuide(diagnostics);
   const buildSummaryHtml = renderBlueprintBuildSummary(data.build_list || {});
   const scaledPlanHtml = renderScaledPlanGuide(summary, diagnostics);
+  const starterMallHtml = renderStarterMallGuide(summary, diagnostics);
   const machineLabel = typeof summary.block_count === 'number' ? 'Assemblers / Labs' : 'Machines';
+  const capacityLabel = typeof summary.output_count === 'number' ? 'Outputs' : 'Capacity';
+  const capacityValue = typeof summary.output_count === 'number'
+    ? String(summary.output_count)
+    : `${(summary.capacity_per_minute || 0).toFixed(1)}/min`;
+  const capacityIcon = typeof summary.output_count === 'number' ? 'OUT' : 'CAP';
 
   document.getElementById('summary-cards').innerHTML = `
     <div class="summary-card ${data.valid ? 'card-green' : 'card-purple'}">
@@ -434,9 +487,9 @@ function renderBlueprintReport(label, data) {
       <div class="sc-label">Blueprint Confidence</div>
     </div>
     <div class="summary-card card-blue">
-      <div class="sc-icon">CAP</div>
-      <div class="sc-value">${(summary.capacity_per_minute || 0).toFixed(1)}/min</div>
-      <div class="sc-label">Capacity</div>
+      <div class="sc-icon">${capacityIcon}</div>
+      <div class="sc-value">${capacityValue}</div>
+      <div class="sc-label">${capacityLabel}</div>
     </div>
     <div class="summary-card card-amber">
       <div class="sc-icon">ASM</div>
@@ -455,6 +508,10 @@ function renderBlueprintReport(label, data) {
         <span class="energy-row-label">Warnings</span>
         <span class="energy-row-val">${warnings.length ? warnings.join('; ') : 'none'}</span>
       </div>
+      <div class="energy-row">
+        <span class="energy-row-label">Upgrade note</span>
+        <span class="energy-row-val">${upgradeNote ? escapeHtml(upgradeNote) : 'none'}</span>
+      </div>
       <button class="save-layout-btn" onclick="copyBlueprintString()">Copy Blueprint String</button>
       <span id="blueprint-copy-status" class="blueprint-copy-status">Ready to copy</span>
       <textarea
@@ -465,6 +522,7 @@ function renderBlueprintReport(label, data) {
         onclick="this.select()"
       >${escapeHtml(data.blueprint_string || '')}</textarea>
       ${buildSummaryHtml}
+      ${starterMallHtml}
       ${scaledPlanHtml}
       ${laneGuideHtml}
       <pre class="ascii-preview">${escapeHtml(data.ascii || '')}</pre>
@@ -524,6 +582,50 @@ function renderScaledPlanGuide(summary, diagnostics) {
         ${stationRows || '<div class="scaled-plan-empty">No train unload stations needed yet for this target.</div>'}
       </div>
     </details>`;
+}
+
+function renderStarterMallGuide(summary, diagnostics) {
+  const outputChests = diagnostics.output_chests || {};
+  const bootstrapInputs = diagnostics.bootstrap_inputs || {};
+  const externalInputs = diagnostics.external_inputs || {};
+  const smeltingNote = diagnostics.feed_from_smelting_note || '';
+  const chestRows = Object.entries(outputChests).map(([item, chest]) => `
+    <div class="scaled-plan-row">
+      <div>
+        <div class="scaled-plan-item">${escapeHtml(formatItemName(item))}</div>
+        <div class="scaled-plan-note">Chest at (${chest.x}, ${chest.y})</div>
+      </div>
+      <span class="scaled-plan-rate">${escapeHtml(chest.chest_id || '')}</span>
+    </div>
+  `).join('');
+
+  if (!Object.keys(outputChests).length) return '';
+
+  return `
+    <details class="scaled-plan-guide" open>
+      <summary>
+        <span>Starter Mall Outputs</span>
+        <span class="build-summary-meta">${summary.output_count || 0} dedicated chests</span>
+      </summary>
+      <div class="scaled-plan-body">
+        <div class="scaled-plan-intro">${escapeHtml(diagnostics.build_stage_note || '')}</div>
+        ${smeltingNote ? `<div class="scaled-plan-intro">${escapeHtml(smeltingNote)}</div>` : ''}
+        <div class="scaled-plan-section-label">Automated Plate Inputs</div>
+        <div class="scaled-plan-intro">${escapeHtml(formatMallInputSummary(externalInputs))}</div>
+        <div class="scaled-plan-section-label">Manual Bootstrap Inputs</div>
+        <div class="scaled-plan-intro">${escapeHtml(formatMallInputSummary(bootstrapInputs))}</div>
+        <div class="scaled-plan-section-label">Output Chests</div>
+        ${chestRows}
+      </div>
+    </details>`;
+}
+
+function formatMallInputSummary(inputs) {
+  const entries = Object.entries(inputs || {});
+  if (!entries.length) return 'none';
+  return entries
+    .map(([item, amount]) => `${formatItemName(item)}: ${Number(amount).toFixed(1)}`)
+    .join(', ');
 }
 
 function renderScaledCandidateChips(candidateOptions) {
@@ -1136,5 +1238,75 @@ function loadLayout(id) {
 }
 
 // ── Boot ───────────────────────────────────────────────────────────────────
+// Strategy refresh overrides: belt-targeted starter base actions
+async function runStarterMiningGenerator() {
+  const selectedName = state.selectedItem?.name;
+  const itemName = selectedName === 'copper_ore' || selectedName === 'copper_plate'
+    ? 'copper_ore'
+    : selectedName === 'coal'
+      ? 'coal'
+      : 'iron_ore';
+  const isCoalChunk = itemName === 'coal';
+  const sizeLabel = isCoalChunk ? 'Half Yellow Ore' : 'Full Yellow Ore';
+  const itemLabel = itemName.replace(/_/g, ' ');
+  const requestBody = isCoalChunk
+    ? {
+      item: itemName,
+      miner_name: 'electric_mining_drill',
+      size_mode: 'half_yellow_15',
+      include_power_poles: true,
+    }
+    : {
+      item: itemName,
+      miner_name: 'electric_mining_drill',
+      size_mode: 'full_yellow_30',
+      include_power_poles: true,
+    };
+
+  await runMilestoneGenerator(
+    '/api/generate-mining-upgrade-block',
+    `Mining Chunk — ${sizeLabel} (${itemLabel})`,
+    requestBody,
+  );
+}
+
+async function runStarterSmeltingGenerator() {
+  const selectedName = state.selectedItem?.name;
+  const recipeName = selectedName === 'copper_plate' || selectedName === 'copper_ore'
+    ? 'copper_plate'
+    : 'iron_plate';
+  const itemLabel = recipeName === 'copper_plate' ? 'Copper' : 'Iron';
+
+  await runMilestoneGenerator(
+    '/api/generate-smelting-upgrade-block',
+    `${itemLabel} Smelting Backbone — 48 Furnaces`,
+    {
+      recipe_name: recipeName,
+      size_mode: 'full_belt_48',
+      machine_name: 'stone_furnace',
+    },
+  );
+}
+
+async function runStarterBrickGenerator() {
+  await runMilestoneGenerator(
+    '/api/generate-brick-smelting-block',
+    'Starter Brick Line — 24 Furnaces',
+    {
+      machine_name: 'stone_furnace',
+    },
+  );
+}
+
+async function runStarterSteelGenerator() {
+  await runMilestoneGenerator(
+    '/api/generate-starter-steel-block',
+    'Starter Steel Block — 12 Furnaces',
+    {
+      machine_name: 'stone_furnace',
+    },
+  );
+}
+
 init();
 loadSavedLayouts();

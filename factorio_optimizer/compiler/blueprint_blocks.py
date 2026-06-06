@@ -197,6 +197,29 @@ def furnace_row(
     ]
 
 
+def miner(
+    object_id: str,
+    x: int,
+    y: int,
+    item: str,
+    machine_name: str,
+    direction: Direction = "east",
+) -> FactoryObject:
+    entity_name = to_entity_name(machine_name)
+    spec = get_entity_spec(entity_name)
+    return FactoryObject(
+        object_id=object_id,
+        object_type="miner",
+        position=Position(x, y),
+        direction=direction,
+        width=spec.width,
+        height=spec.height,
+        item=item,
+        role="ore_producer",
+        entity_name=entity_name,
+    )
+
+
 def electric_pole(
     object_id: str,
     x: int,
@@ -210,6 +233,25 @@ def electric_pole(
         direction="north",
         role="power",
         entity_name=to_entity_name(pole_name),
+    )
+
+
+def chest(
+    object_id: str,
+    x: int,
+    y: int,
+    item: str | None = None,
+    role: str = "buffer",
+    chest_name: str = "iron_chest",
+) -> FactoryObject:
+    return FactoryObject(
+        object_id=object_id,
+        object_type="chest",
+        position=Position(x, y),
+        direction="north",
+        item=item,
+        role=role,
+        entity_name=to_entity_name(chest_name),
     )
 
 

@@ -86,6 +86,65 @@ def test_blueprint_generation_endpoints() -> None:
     assert red["valid"] is True
     assert red["blueprint_string"].startswith("0")
 
+    starter_mall = _assert_ok(
+        client.post("/api/generate-starter-mall", json={}),
+        "/api/generate-starter-mall",
+    )
+    assert starter_mall["valid"] is True
+    assert starter_mall["summary"]["item"] == "starter_mall"
+    assert starter_mall["summary"]["output_count"] == 13
+    assert len(starter_mall["diagnostics"]["output_chests"]) == 13
+
+    starter_mining = _assert_ok(
+        client.post(
+            "/api/generate-mining-upgrade-block",
+            json={"item": "iron_ore"},
+        ),
+        "/api/generate-mining-upgrade-block",
+    )
+    assert starter_mining["valid"] is True
+    assert starter_mining["summary"]["item"] == "iron_ore"
+    assert starter_mining["summary"]["block_mode"] == "full_yellow_30"
+    assert starter_mining["summary"]["miner_count"] == 30
+    assert starter_mining["diagnostics"]["belt_output_side"] == "right"
+    assert starter_mining["diagnostics"]["target_belt_items_per_second"] == 15.0
+
+    starter_smelting = _assert_ok(
+        client.post(
+            "/api/generate-smelting-upgrade-block",
+            json={"recipe_name": "iron_plate", "rate": 30, "unit": "per_minute"},
+        ),
+        "/api/generate-smelting-upgrade-block",
+    )
+    assert starter_smelting["valid"] is True
+    assert starter_smelting["summary"]["item"] == "iron_plate"
+    assert starter_smelting["summary"]["block_mode"] == "full_belt_48"
+    assert starter_smelting["summary"]["furnace_count"] == 48
+    assert starter_smelting["summary"]["furnaces_per_side"] == 24
+    assert starter_smelting["diagnostics"]["fuel_delivery"] == "local_coal_chests"
+    assert starter_smelting["diagnostics"]["coal_support"] == "one local coal chest per furnace"
+    assert starter_smelting["diagnostics"]["layout_shape"] == "mirrored_double_row_24_per_side"
+    assert starter_smelting["summary"]["capacity_per_minute"] == 900.0
+
+    starter_bricks = _assert_ok(
+        client.post("/api/generate-brick-smelting-block", json={}),
+        "/api/generate-brick-smelting-block",
+    )
+    assert starter_bricks["valid"] is True
+    assert starter_bricks["summary"]["item"] == "stone_brick"
+    assert starter_bricks["summary"]["furnace_count"] == 24
+    assert starter_bricks["summary"]["capacity_per_minute"] == 450.0
+
+    starter_steel = _assert_ok(
+        client.post("/api/generate-starter-steel-block", json={}),
+        "/api/generate-starter-steel-block",
+    )
+    assert starter_steel["valid"] is True
+    assert starter_steel["summary"]["item"] == "steel_plate"
+    assert starter_steel["summary"]["furnace_count"] == 12
+    assert starter_steel["diagnostics"]["external_inputs"]["iron_plate"] == 3.75
+    assert starter_steel["diagnostics"]["upstream_plate_demand_per_minute"] == 225.0
+
     scaled = _assert_ok(
         client.post(
             "/api/generate-scaled-early-science-plan",
@@ -135,6 +194,9 @@ def test_blueprint_routes_reject_bad_rates() -> None:
     client = app.test_client()
     endpoints = [
         "/api/generate-smelting-block",
+        "/api/generate-smelting-upgrade-block",
+        "/api/generate-brick-smelting-block",
+        "/api/generate-starter-steel-block",
         "/api/generate-green-circuit-block",
         "/api/generate-red-science-block",
         "/api/generate-scaled-early-science-plan",
@@ -149,6 +211,43 @@ def test_blueprint_routes_reject_bad_rates() -> None:
         response = client.post(endpoint, json={"recipe_name": "iron_plate", "rate": -1})
         assert response.status_code == 400
         assert response.get_json()["error"]
+
+
+def test_starter_smelting_route_rejects_invalid_size_mode() -> None:
+    client = app.test_client()
+
+    response = client.post(
+        "/api/generate-smelting-upgrade-block",
+        json={"recipe_name": "iron_plate", "size_mode": "mega_96"},
+    )
+
+    assert response.status_code == 400
+    assert "size_mode" in response.get_json()["error"]
+
+
+def test_starter_mining_route_rejects_invalid_inputs() -> None:
+    client = app.test_client()
+
+    response = client.post(
+        "/api/generate-mining-upgrade-block",
+        json={"item": "stone"},
+    )
+    assert response.status_code == 400
+    assert "item" in response.get_json()["error"]
+
+    response = client.post(
+        "/api/generate-mining-upgrade-block",
+        json={"item": "iron_ore", "size_mode": "mega_32"},
+    )
+    assert response.status_code == 400
+    assert "size_mode" in response.get_json()["error"]
+
+    response = client.post(
+        "/api/generate-smelting-upgrade-block",
+        json={"recipe_name": "stone_brick"},
+    )
+    assert response.status_code == 400
+    assert "recipe_name" in response.get_json()["error"]
 
 
 def test_scaled_early_science_route_rejects_invalid_block_rate() -> None:

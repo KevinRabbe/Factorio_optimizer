@@ -64,7 +64,21 @@ ENTITY_SPECS: dict[str, EntitySpec] = {
         machine_type="furnace",
         recipe_categories=("smelting",),
     ),
+    "burner-mining-drill": EntitySpec(
+        name="burner-mining-drill",
+        width=3,
+        height=3,
+        machine_type="miner",
+    ),
+    "electric-mining-drill": EntitySpec(
+        name="electric-mining-drill",
+        width=3,
+        height=3,
+        requires_power=True,
+        machine_type="miner",
+    ),
     "splitter": EntitySpec(name="splitter", width=2, height=1),
+    "iron-chest": EntitySpec(name="iron-chest", width=1, height=1),
     "pipe": EntitySpec(name="pipe", width=1, height=1),
     "pipe-to-ground": EntitySpec(name="pipe-to-ground", width=1, height=1),
     "chemical-plant": EntitySpec(

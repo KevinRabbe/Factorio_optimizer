@@ -45,7 +45,7 @@ RECIPES: dict[str, Recipe] = {
         name="steel_plate",
         inputs={"iron_plate": 5},
         outputs={"steel_plate": 1},
-        crafting_time_seconds=17.5,
+        crafting_time_seconds=16.0,
         category="smelting",
     ),
 
@@ -98,6 +98,12 @@ RECIPES: dict[str, Recipe] = {
         name="pipe",
         inputs={"iron_plate": 1},
         outputs={"pipe": 1},
+        crafting_time_seconds=0.5,
+    ),
+    "pipe_to_ground": Recipe(
+        name="pipe_to_ground",
+        inputs={"pipe": 10, "iron_plate": 5},
+        outputs={"pipe_to_ground": 2},
         crafting_time_seconds=0.5,
     ),
     "stone_wall": Recipe(
@@ -223,6 +229,24 @@ RECIPES: dict[str, Recipe] = {
         inputs={"iron_gear_wheel": 10, "electronic_circuit": 10, "transport_belt": 4},
         outputs={"lab": 1},
         crafting_time_seconds=2.0,
+    ),
+    "stone_furnace": Recipe(
+        name="stone_furnace",
+        inputs={"stone": 5},
+        outputs={"stone_furnace": 1},
+        crafting_time_seconds=0.5,
+    ),
+    "boiler": Recipe(
+        name="boiler",
+        inputs={"pipe": 4, "stone_furnace": 1},
+        outputs={"boiler": 1},
+        crafting_time_seconds=0.5,
+    ),
+    "steam_engine": Recipe(
+        name="steam_engine",
+        inputs={"iron_plate": 10, "iron_gear_wheel": 8, "pipe": 5},
+        outputs={"steam_engine": 1},
+        crafting_time_seconds=0.5,
     ),
 
     # ═══════════════════════════════════════════════════════════════════════
