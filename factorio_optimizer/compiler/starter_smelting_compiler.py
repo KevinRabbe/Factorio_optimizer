@@ -12,6 +12,7 @@ from factorio_optimizer.compiler.blueprint_blocks import (
     inserter,
     io_lane,
 )
+from factorio_optimizer.compiler.connectors import belt_input, belt_output, manual_input
 from factorio_optimizer.compiler.mid_tier_compiler import FactoryBlueprintReport
 from factorio_optimizer.core.blueprint_plan import BlueprintPlan
 from factorio_optimizer.core.objects import FactoryObject
@@ -81,7 +82,6 @@ def compile_starter_smelting_block(request: StarterSmeltingRequest) -> FactoryBl
         if request.size_mode is not None
         else rate_based_machine_count
     )
-    machine_count_exact = float(machine_count) if request.size_mode is not None else rate_based_exact
     selected_mode = request.size_mode or "rate_based"
 
     default_row_size = _DEFAULT_FURNACES_PER_ROW.get(request.size_mode or "", request.max_furnaces_per_row)
@@ -140,10 +140,30 @@ def compile_starter_smelting_block(request: StarterSmeltingRequest) -> FactoryBl
         intended_output = "starter burner smelting output"
         furnaces_per_side = furnaces_per_row
 
+    output_belt_target = (
+        30.0
+        if request.machine_name == "steel_furnace" and selected_mode == "full_belt_48"
+        else 15.0
+        if selected_mode == "full_belt_48"
+        else 7.5
+        if selected_mode == "brick_24"
+        else round(capacity_per_second, 6)
+    )
+    target_belt_tier = "yellow" if request.machine_name == "stone_furnace" else "red"
     diagnostics = {
         "external_inputs": {
             input_item: round(input_rate_per_second, 6),
         },
+        "connectors": _build_connectors(
+            input_item=input_item,
+            output_item=output_item,
+            fuel_item=request.fuel_item,
+            input_rate_per_second=input_rate_per_second,
+            output_rate_per_second=capacity_per_second,
+            output_belt_target=output_belt_target,
+            belt_name=request.belt_name,
+            is_mirrored_layout=is_mirrored_layout,
+        ),
         "fuel_delivery": "local_coal_chests",
         "fuel_buffers": machine_count,
         "ore_input_rate": round(input_rate_per_minute, 4),
@@ -151,8 +171,8 @@ def compile_starter_smelting_block(request: StarterSmeltingRequest) -> FactoryBl
         "coal_support": "one local coal chest per furnace",
         "upgrade_note": upgrade_note,
         "intended_output": intended_output,
-        "target_belt_tier": "yellow" if request.machine_name == "stone_furnace" else "red",
-        "target_output_belt_items_per_second": 30.0 if request.machine_name == "steel_furnace" and selected_mode == "full_belt_48" else 15.0 if selected_mode == "full_belt_48" else 7.5 if selected_mode == "brick_24" else round(capacity_per_second, 6),
+        "target_belt_tier": target_belt_tier,
+        "target_output_belt_items_per_second": output_belt_target,
         "layout_shape": f"mirrored_double_row_{furnaces_per_side}_per_side" if is_mirrored_layout else "single_or_compact_rows",
         "furnaces_per_side": furnaces_per_side,
         "input_lanes": {
@@ -212,6 +232,48 @@ def compile_starter_smelting_block(request: StarterSmeltingRequest) -> FactoryBl
         build_list=build_list,
         diagnostics=diagnostics,
     )
+
+
+def _build_connectors(
+    *,
+    input_item: str,
+    output_item: str,
+    fuel_item: str,
+    input_rate_per_second: float,
+    output_rate_per_second: float,
+    output_belt_target: float,
+    belt_name: str,
+    is_mirrored_layout: bool,
+) -> list[dict[str, object]]:
+    lane_count = 2 if is_mirrored_layout else 1
+    return [
+        belt_input(
+            f"{input_item}_input",
+            input_item,
+            side="left",
+            direction="east",
+            rate_per_second=input_rate_per_second,
+            belt_tier=belt_name,
+            lane_count=lane_count,
+            description="Ore or plate input for the smelting block.",
+            connects_to=(f"{input_item}_output",),
+        ),
+        manual_input(
+            f"{fuel_item}_manual_fuel_input",
+            fuel_item,
+            description="Local fuel chest input for burner furnaces; replace with a fuel belt in a later connector version.",
+        ),
+        belt_output(
+            f"{output_item}_output",
+            output_item,
+            side="right",
+            direction="east",
+            rate_per_second=min(output_rate_per_second, output_belt_target),
+            belt_tier=belt_name,
+            description="Main smelted output belt leaving toward the bus, mall, or next production block.",
+            connects_to=(f"{output_item}_input",),
+        ),
+    ]
 
 
 def _build_plan(
