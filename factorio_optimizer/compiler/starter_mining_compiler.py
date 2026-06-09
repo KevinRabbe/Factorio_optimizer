@@ -10,6 +10,7 @@ from factorio_optimizer.compiler.blueprint_blocks import (
     io_lane,
     miner,
 )
+from factorio_optimizer.compiler.connectors import belt_output
 from factorio_optimizer.compiler.mid_tier_compiler import FactoryBlueprintReport
 from factorio_optimizer.core.blueprint_plan import BlueprintPlan
 from factorio_optimizer.core.objects import FactoryObject
@@ -80,8 +81,22 @@ def compile_starter_mining_block(request: StarterMiningRequest) -> FactoryBluepr
     )
     artifacts = compile_blueprint_artifacts(plan)
 
+    connectors = [
+        belt_output(
+            f"{request.item}_output",
+            request.item,
+            side="right",
+            direction="east",
+            rate_per_second=estimated_output_per_second,
+            belt_tier=request.belt_name,
+            description=f"Main {request.item} output belt; {intended_feed}.",
+            connects_to=(f"{request.item}_input",),
+        )
+    ]
+
     diagnostics = {
         "external_inputs": {},
+        "connectors": connectors,
         "ore_output_rate": round(estimated_output_per_second * 60.0, 4),
         "estimated_output_per_second": round(estimated_output_per_second, 6),
         "target_belt_items_per_second": target_belt_items_per_second,
