@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 from factorio_optimizer.compiler.blueprint_blocks import (
     assembler,
@@ -11,6 +10,7 @@ from factorio_optimizer.compiler.blueprint_blocks import (
     io_lane,
     inserter,
 )
+from factorio_optimizer.compiler.connectors import belt_input, chest_output, manual_input
 from factorio_optimizer.compiler.mid_tier_compiler import FactoryBlueprintReport
 from factorio_optimizer.core.blueprint_plan import BlueprintPlan
 from factorio_optimizer.core.objects import FactoryObject
@@ -75,6 +75,7 @@ def compile_starter_mall(request: StarterMallRequest) -> FactoryBlueprintReport:
     diagnostics = {
         "external_inputs": external_inputs,
         "bootstrap_inputs": bootstrap_inputs,
+        "connectors": _build_connectors(external_inputs, bootstrap_inputs),
         "output_chests": output_chests,
         "intermediate_load": intermediate_load,
         "build_stage_note": (
@@ -108,6 +109,39 @@ def compile_starter_mall(request: StarterMallRequest) -> FactoryBlueprintReport:
         build_list=build_list,
         diagnostics=diagnostics,
     )
+
+
+def _build_connectors(external_inputs: dict[str, float], bootstrap_inputs: dict[str, float]) -> list[dict[str, object]]:
+    connectors: list[dict[str, object]] = []
+    for item in sorted(external_inputs):
+        connectors.append(
+            belt_input(
+                f"{item}_input",
+                item,
+                side="left",
+                direction="east",
+                rate_per_second=0.0,
+                description=f"Chest-fed mall input for {item}; feed from smelting backbone output.",
+                connects_to=(f"{item}_output",),
+            )
+        )
+    for item in sorted(bootstrap_inputs):
+        connectors.append(
+            manual_input(
+                f"{item}_manual_input",
+                item,
+                description=f"Manual bootstrap input for starter mall recipes that need {item}.",
+            )
+        )
+    for item in _STARTER_MALL_ITEMS:
+        connectors.append(
+            chest_output(
+                f"{item}_chest_output",
+                item,
+                description=f"Mall output chest for {item}.",
+            )
+        )
+    return connectors
 
 
 def _build_starter_mall_plan(request: StarterMallRequest) -> BlueprintPlan:
