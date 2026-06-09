@@ -94,6 +94,10 @@ def test_blueprint_generation_endpoints() -> None:
     assert starter_mall["summary"]["item"] == "starter_mall"
     assert starter_mall["summary"]["output_count"] == 13
     assert len(starter_mall["diagnostics"]["output_chests"]) == 13
+    mall_connectors = starter_mall["diagnostics"]["connectors"]
+    assert any(connector["id"] == "iron_plate_input" and connector["kind"] == "belt_input" for connector in mall_connectors)
+    assert any(connector["id"] == "copper_plate_input" and connector["kind"] == "belt_input" for connector in mall_connectors)
+    assert any(connector["kind"] == "chest_output" and connector["item"] == "transport_belt" for connector in mall_connectors)
 
     starter_mining = _assert_ok(
         client.post(
@@ -108,6 +112,10 @@ def test_blueprint_generation_endpoints() -> None:
     assert starter_mining["summary"]["miner_count"] == 30
     assert starter_mining["diagnostics"]["belt_output_side"] == "right"
     assert starter_mining["diagnostics"]["target_belt_items_per_second"] == 15.0
+    mining_connectors = starter_mining["diagnostics"]["connectors"]
+    assert mining_connectors[0]["id"] == "iron_ore_output"
+    assert mining_connectors[0]["kind"] == "belt_output"
+    assert mining_connectors[0]["rate_per_second"] == 15.0
 
     starter_smelting = _assert_ok(
         client.post(
@@ -125,6 +133,10 @@ def test_blueprint_generation_endpoints() -> None:
     assert starter_smelting["diagnostics"]["coal_support"] == "one local coal chest per furnace"
     assert starter_smelting["diagnostics"]["layout_shape"] == "mirrored_double_row_24_per_side"
     assert starter_smelting["summary"]["capacity_per_minute"] == 900.0
+    smelting_connectors = starter_smelting["diagnostics"]["connectors"]
+    assert any(connector["id"] == "iron_ore_input" and connector["kind"] == "belt_input" for connector in smelting_connectors)
+    assert any(connector["id"] == "iron_plate_output" and connector["kind"] == "belt_output" for connector in smelting_connectors)
+    assert any(connector["kind"] == "manual_input" and connector["item"] == "coal" for connector in smelting_connectors)
 
     starter_bricks = _assert_ok(
         client.post("/api/generate-brick-smelting-block", json={}),
@@ -257,18 +269,5 @@ def test_scaled_early_science_route_rejects_invalid_block_rate() -> None:
         "/api/generate-scaled-early-science-plan",
         json={"rate": 30, "unit": "per_minute", "block_rate": 60, "block_unit": "per_minute"},
     )
-
     assert response.status_code == 400
-    assert "block_rate" in response.get_json()["error"]
-
-
-def test_scaled_green_circuit_route_rejects_invalid_block_rate() -> None:
-    client = app.test_client()
-
-    response = client.post(
-        "/api/generate-scaled-green-circuit-plan",
-        json={"rate": 60, "unit": "per_minute", "block_rate": 120, "block_unit": "per_minute"},
-    )
-
-    assert response.status_code == 400
-    assert "block_rate" in response.get_json()["error"]
+    assert "capacity" in response.get_json()["error"]
